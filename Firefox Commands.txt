@@ -1,0 +1,89 @@
+// var pageMod = require("sdk/page-mod");
+ 
+ // pageMod.PageMod({
+  // include: "*.foodsharing.de",
+  // contentScript: 'window.alert("Page matches ruleset");'
+// });
+ 
+
+
+// called every time a tab loads and is ready
+// adds a red border to the tab's content
+require("sdk/tabs").on("ready", runScript);
+function runScript(tab) {
+  tab.attach({
+    contentScript: "if (document.body) document.body.style.border = '5px solid red';"
+  });
+}
+
+
+
+var { ActionButton } = require('sdk/ui/button/action');
+var tabs = require("sdk/tabs");
+var { ToggleButton } = require("sdk/ui/button/toggle");
+var panels = require("sdk/panel");
+var self = require("sdk/self");
+
+
+var button1 = ToggleButton({
+  id: "mozilla-link",
+  label: "Foodsharing",
+  icon: {
+    "16": "./MS-16.png",
+    "32": "./MS-32.png",
+    "64": "./MS-64.png"
+  },
+  badge: 0,
+  badgeColor: "#000000",
+  onClick: handleChange
+});
+
+var panel = panels.Panel({
+	contentURL: self.data.url("panel.html"),
+	// contentScriptFile: data.url("panelScript.js"),
+	onHide : handleHide	
+});
+ 
+ // when panel is displayed, let its script know about it!
+// panel.on("show", function()
+// {
+	// panel.port.emit("show");
+// });
+
+// panel.port.on("text-entered", function(text)
+// {
+	// console.log(text);
+	// text_entry.hide();
+// }
+  
+function handleHide()
+{
+	button1.state('window', {checked: false});
+}
+
+function handleChange(state) {
+  // tabs.open("www.mozilla.org");
+  if(state.checked)
+  {
+	  // panel.show({position: button});
+  }
+}
+
+
+
+
+
+// function handleClick(state) {
+  // tabs.open("https://foodsharing.de/");
+// }
+
+// var button2 = ToggleButton({
+   // id: "my-button",
+   // label: "Mozilla Verknüpfung",
+   // icon: {
+	// "16": "./icon-16.png",
+	// "32": "./icon-32.png",
+	// "64": "./icon-64.png"
+   // },
+   // onChange: handleChange
+  // });
