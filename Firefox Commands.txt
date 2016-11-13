@@ -1,11 +1,16 @@
-// var pageMod = require("sdk/page-mod");
- 
- // pageMod.PageMod({
-  // include: "*.foodsharing.de",
-  // contentScript: 'window.alert("Page matches ruleset");'
-// });
- 
+ // looks for pages that match the pattern and attaches a content script to them
+var pageMod = require("sdk/page-mod");
+pageMod.PageMod({
+  include: "*.foodsharing.de",
+  contentScriptFile: data.url("watcherContentSCRIPT.js")
+});
 
+// does not work, since pageMod does not include the worker-API (needed for communication)
+pageMod.port.on("foodsharing loaded", function(text)
+{
+	window.alert("This is main speaking..." + text);
+});
+ 
 
 // called every time a tab loads and is ready
 // adds a red border to the tab's content
