@@ -22,6 +22,7 @@ if(document.getElementById("loginbar"))
 	
 	self.port.once("login", function(email, password)
 	{
+		console.log("received login command");
 		var form = document.getElementById("loginbar");
 
 		// enter email
