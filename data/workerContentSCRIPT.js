@@ -33,11 +33,6 @@ if(document.getElementById("loginbar"))
 
 		form.submit();
 
-		self.port.on("refreshPage", function()
-		{
-			console.log("I've been asked to refresh");
-		});
-
 		self.port.emit("startInterval");
 	});
 
@@ -71,4 +66,7 @@ self.on("message", function(addonMessage) {
 console.log("reached end of worker script");
 
 
-
+self.port.on("refreshPage", function()
+{
+	console.log("I've been asked to refresh");
+});

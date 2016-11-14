@@ -51,7 +51,7 @@ pageWorker.port.on("requestLogin", function()
 
 pageWorker.port.on("updateBadge", function(value)
 {
-  console.log("updating badge");
+  console.log("received new value. updating badge");
   button.badge = value;
   pageWorker.port.emit("refreshPage");
 });
