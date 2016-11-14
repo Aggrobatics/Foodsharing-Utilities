@@ -34,38 +34,62 @@ var intervalID;
 
 // PAGE WORKER  ____________________________________________________________________________
 
-// loads an invisible page in the background
-pageWorker = require("sdk/page-worker").Page(
-{
-  contentScriptFile: data.url("workerContentSCRIPT.js"),
-  contentURL: "https://foodsharing.de/",
-  contentScriptWhen: "ready",
-  // onMessage: handleWorkerMessage
-});
+// button to create pageWorker (debugging purposes)
+// Create a button
 
-pageWorker.port.on("requestLogin", function()
-{
-  console.log("pageWorker has requested login-command. sending request now");
-  pageWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
-});
 
-pageWorker.port.on("updateBadge", function(value)
-{
-  console.log("received new value. updating badge");
-  button.badge = value;
-  pageWorker.port.emit("refreshPage");
-});
+// var { ActionButton } = require("sdk/ui/button/action");
+// var workerButton = ActionButton({
+//   id: "show-panel",
+//   label: "Show Panel",
+//   icon: {
+//     "16": "./icon-16.png",
+//     "32": "./icon-32.png",
+//     "64": "./icon-64.png"
+//   },
+// 	badge: 0,
+// 	badgeColor: "#00AAAA",
+//   onClick: createWorker
+// });
 
-pageWorker.port.on("startInterval", function startInterval()
-{
-    console.log("starting interval timer now");
-    intervalID = setInterval(function() 
-    {
-      console.log("prompting pageWorker for refresh");
-      pageWorker.port.emit("refreshPage");
-      pageWorker.postMessage("refreshPageMessage");
-    }, 4000)
-});
+// function createWorker()
+// {
+  // loads an invisible page in the background
+  pageWorker = require("sdk/page-worker").Page(
+  {
+    contentScriptFile: data.url("workerContentSCRIPT.js"),
+    contentURL: "https://foodsharing.de/",
+    contentScriptWhen: "end",
+    // onMessage: handleWorkerMessage
+  });
+
+  pageWorker.port.on("requestLogin", function()
+  {
+    console.log("pageWorker has requested login-command. sending request now");
+    pageWorker.contentScriptWhen = "ready";
+    pageWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
+  });
+
+  pageWorker.port.on("updateBadge", function(value)
+  {
+    console.log("received new value. updating button");
+    button.badge = value;
+  });
+
+  pageWorker.port.on("startInterval", function startInterval()
+  {
+      console.log("starting interval timer now");
+      intervalID = setInterval(function() 
+      {
+        console.log("prompting pageWorker for refresh");
+        // pageWorker.port.emit("refreshPage");
+        pageWorker.contentURL = "https://foodsharing.de/?page=bcard";
+        // pageWorker.postMessage("refreshPageMessage");
+      }, 6000)
+  });
+
+//}
+
 
 // PAGE MOD     ____________________________________________________________________________
 
@@ -73,22 +97,22 @@ pageWorker.port.on("startInterval", function startInterval()
 // looks for pages that match the pattern and attaches a content script to them
 // cannot attach anything to pageMod, as it is only created when page is opened...it's just sad
 
-var pageMod = require("sdk/page-mod");
-pageMod.PageMod({
-  include: "https://foodsharing.de*",
-  //include: "https://foodsharing.de/?page=*",
-  contentScriptWhen: "start",
-  contentScriptFile: data.url("modContentSCRIPT.js"),
-  attachTo: ["existing", "top", "frame"],
-  onAttach: function (worker) 
-  {
-      console.log("pageMod has started");
-      worker.port.on('foodsharingLoaded', function(text)
-      {
-          console.log('message from pageMod: ' + text);
-      });
-  }
-});
+// var pageMod = require("sdk/page-mod");
+// pageMod.PageMod({
+//   include: "https://foodsharing.de*",
+//   //include: "https://foodsharing.de/?page=*",
+//   contentScriptWhen: "start",
+//   contentScriptFile: data.url("modContentSCRIPT.js"),
+//   attachTo: ["existing", "top", "frame"],
+//   onAttach: function (worker) 
+//   {
+//       console.log("pageMod has started");
+//       worker.port.on('foodsharingLoaded', function(text)
+//       {
+//           console.log('message from pageMod: ' + text);
+//       });
+//   }
+// });
 
 // TOGGLE BUTTON ____________________________________________________________________________
 
