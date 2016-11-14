@@ -1,14 +1,46 @@
+/*
+
+if(loginbar present) {
+    self.port.on('login', function(email, password) {
+        // fill form, submit
+    });
+    self.port.emit('requestLogin');
+} else if(badge found) {
+    self.port.emit('updateBadge', css_badge.textContent);
+}
+
+// remove images here
+
+*/
+
 var css_badge;
 // var observer;
 
 if(document.getElementById("loginbar"))
 {
-	console.log("loginbar found. Trying to log in now");	
-	var form = document.getElementById("loginbar");
+	console.log("loginbar found. Waiting for login command");	
+	
+	self.port.once("login", function(email, password)
+	{
+		var form = document.getElementById("loginbar");
 
-	form[0].value = "markus.schmieder@gmx.de";
-	form[1].value = "Joe5023234";
-	form.submit();
+		// enter email
+		document.querySelector("#loginbar input[name=email_adress]").value = email;
+		
+		// enter password
+		document.querySelector("#loginbar input[name=password]").value = password;
+
+		form.submit();
+
+		self.port.on("refreshPage", function()
+		{
+			console.log("I've been asked to refresh");
+		});
+
+		self.port.emit("startInterval");
+	});
+
+	self.port.emit("requestLogin");
 }
 else if(document.querySelector(".msg > a:nth-child(1) > span:nth-child(2)"))//.getElementsByClassName("msg").getElementsByClassName("badge"))
 {
@@ -21,14 +53,8 @@ else if(document.querySelector(".msg > a:nth-child(1) > span:nth-child(2)"))//.g
 	/*
 	* observer functionality does not work, as the page doesnt update itself
 	*/
-	
-	self.port.emit("startInterval");
+	self.port.emit("updateBadge", css_badge.innerHTML);
 };
-
-self.port.on("refreshPage", function()
-{
-	console.log("I've been asked to refresh");
-});
 
 // PORT MESSAGE APPROACH
 self.port.on("myMessage", function handleMyMessage(myMessagePayload) {
@@ -42,5 +68,6 @@ self.on("message", function(addonMessage) {
 });
 
 console.log("reached end of worker script");
+
 
 

@@ -39,8 +39,21 @@ pageWorker = require("sdk/page-worker").Page(
 {
   contentScriptFile: data.url("workerContentSCRIPT.js"),
   contentURL: "https://foodsharing.de/",
-  contentScriptWhen: "end",
+  contentScriptWhen: "ready",
   // onMessage: handleWorkerMessage
+});
+
+pageWorker.port.on("requestLogin", function()
+{
+  console.log("pageWorker has requested login-command. sending request now");
+  pageWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
+});
+
+pageWorker.port.on("updateBadge", function(value)
+{
+  console.log("updating badge");
+  button.badge = value;
+  pageWorker.port.emit("refreshPage");
 });
 
 pageWorker.port.on("startInterval", function startInterval()
@@ -53,13 +66,6 @@ pageWorker.port.on("startInterval", function startInterval()
       pageWorker.postMessage("refreshPageMessage");
     }, 4000)
 });
-
-
-// function handleWorkerMessage(message)
-// {
-//   console.log("received message from worker: " + message);
-// }
-
 
 // PAGE MOD     ____________________________________________________________________________
 
