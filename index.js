@@ -1,31 +1,3 @@
-// XML HTTP Request ____________________________________________________________________________
-
-// function startXmlHttpRequest(url) {
-//   var httpRequest;
-
-//   httpRequest = new XMLHttpRequest();
-
-//   if (!httpRequest) {
-//     alert('Giving up :( Cannot create an XMLHTTP instance');
-//     return false;
-//   }
-//   httpRequest.onreadystatechange = alertContents;
-//   httpRequest.open('GET', url);
-//   httpRequest.send();
-
-//   function alertContents() {
-//     if (httpRequest.readyState === XMLHttpRequest.DONE) {
-//       if (httpRequest.status === 200) {
-//         alert(httpRequest.responseText);
-//       } else {
-//         alert('There was a problem with the request.');
-//       }
-//     }
-//   }
-// }
-
-// startXmlHttpRequest("https://foodsharing.de/");
-
 var data = require("sdk/self").data;
 
 // TABS         ____________________________________________________________________________
@@ -46,13 +18,21 @@ function logURL(tab)
 var { setInterval } = require("sdk/timers");
 var intervalID;
 
+// // LOGIN WORKER ____________________________________________________________________________
+
+// loginWorker = require("sdk/page-worker").Page(
+// {
+//   contentScriptFile: data.url("workerLoginSCRIPT.js"),
+//   contentURL: "https://foodsharing.de/",
+//   contentScriptWhen: "end",
+// });
+
+// loginWorker.port.on("loginPerformed", function()
+// {
+//   loginWorker.
+// });
+
 // PAGE WORKER  ____________________________________________________________________________
-
-
-function handleWorkerMessage(message)
-{
-  console.log("received message from worker: " + message);
-}
 
 // loads an invisible page in the background
 pageWorker = require("sdk/page-worker").Page(
@@ -60,23 +40,25 @@ pageWorker = require("sdk/page-worker").Page(
   contentScriptFile: data.url("workerContentSCRIPT.js"),
   contentURL: "https://foodsharing.de/",
   contentScriptWhen: "end",
-  onMessage: handleWorkerMessage
+  // onMessage: handleWorkerMessage
 });
 
 pageWorker.port.on("startInterval", function startInterval()
 {
-    tabs.open("https://foodsharing.de");
     console.log("starting interval timer now");
     intervalID = setInterval(function() 
     {
       console.log("prompting pageWorker for refresh");
       pageWorker.port.emit("refreshPage");
       pageWorker.postMessage("refreshPageMessage");
-
-      // var myMessagePayload = "some data";
-      // pageWorker.port.emit("myMessage", myMessagePayload);
     }, 4000)
 });
+
+
+// function handleWorkerMessage(message)
+// {
+//   console.log("received message from worker: " + message);
+// }
 
 
 // PAGE MOD     ____________________________________________________________________________
@@ -86,7 +68,6 @@ pageWorker.port.on("startInterval", function startInterval()
 // cannot attach anything to pageMod, as it is only created when page is opened...it's just sad
 
 var pageMod = require("sdk/page-mod");
-var modRef;
 pageMod.PageMod({
   include: "https://foodsharing.de*",
   //include: "https://foodsharing.de/?page=*",
@@ -95,15 +76,11 @@ pageMod.PageMod({
   attachTo: ["existing", "top", "frame"],
   onAttach: function (worker) 
   {
-    worker.on('start', function(state)
-    {
       console.log("pageMod has started");
       worker.port.on('foodsharingLoaded', function(text)
       {
           console.log('message from pageMod: ' + text);
-          modRef.port.emit();
       });
-    });
   }
 });
 
@@ -126,7 +103,6 @@ var button = require("sdk/ui/button/toggle").ToggleButton({
 
 // Show the panel when the user clicks the button.
 function handleChange(state) {
-  // tabs.open("www.mozilla.org");
   if(state.checked)
   {
 	  panel.show({position: button});
@@ -167,3 +143,30 @@ panel.port.on("text-entered", function (text) {
 });
 
 
+// XML HTTP Request ____________________________________________________________________________
+
+// function startXmlHttpRequest(url) {
+//   var httpRequest;
+
+//   httpRequest = new XMLHttpRequest();
+
+//   if (!httpRequest) {
+//     alert('Giving up :( Cannot create an XMLHTTP instance');
+//     return false;
+//   }
+//   httpRequest.onreadystatechange = alertContents;
+//   httpRequest.open('GET', url);
+//   httpRequest.send();
+
+//   function alertContents() {
+//     if (httpRequest.readyState === XMLHttpRequest.DONE) {
+//       if (httpRequest.status === 200) {
+//         alert(httpRequest.responseText);
+//       } else {
+//         alert('There was a problem with the request.');
+//       }
+//     }
+//   }
+// }
+
+// startXmlHttpRequest("https://foodsharing.de/");
