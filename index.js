@@ -1,18 +1,31 @@
 // component returned failure code: 0x80520012 <NS_ERROR_FILE_NOT_FOUND> [nsIWebNavigation.loadURI]
 
+try
+{
+
 var data = require("sdk/self").data;
+var loggedIn = 0;
+var pickupHTMLElement;
+var tabs = require("sdk/tabs");
+var panel;
 
 // TABS         ____________________________________________________________________________
 
-var tabs = require("sdk/tabs");
 // tabs.open("foodsharing.de");
 
 // called every time a tab loads and is ready
 // prints the new url in console
-require("sdk/tabs").on("ready", logURL);
+tabs.on("ready", logURL);
 function logURL(tab) 
 {
-  console.log(tab.url);
+  if(tab.url == "about:blank")
+  {
+    console.log("CRASHED");
+  }
+  else
+  {
+    console.log(tab.url);
+  }
 }
 
 // TIMER        ____________________________________________________________________________
@@ -20,66 +33,133 @@ function logURL(tab)
 var { setInterval } = require("sdk/timers");
 var intervalID;
 
-// MESSAGES WORKER  ____________________________________________________________________________
-
-// button to create pageWorker (debugging purposes)
-// Create a button
-
+// MSGButton     ____________________________________________________________________________
 
 var { ActionButton } = require("sdk/ui/button/action");
-var workerButton = ActionButton({
-  id: "start-login",
-  icon: {
-    "16": "./icon-16.png",
-    "32": "./icon-32.png",
-    "64": "./icon-64.png"
-  },
-  label: "Start Login",
-	badgeColor: "#00AAAA",
-  onClick: createMsgWorker
+    var msgWorkerButton = ActionButton({
+      id: "create-message-worker",
+      icon: {
+        "16": "./icon-16.png",
+        "32": "./icon-32.png",
+        "64": "./icon-64.png"
+      },
+      label: "Create Message Worker (no interval)",
+      badgeColor: "#00AAAA",
+    });
+
+// LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
+
+// loginWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
+
+loginWorker = require("sdk/page-worker").Page(
+{
+  contentScriptFile:  data.url("loginWorker.js"),
+  contentURL: "https://www.foodsharing.de",
+  contentScriptWhen: "end"
 });
 
-function createMsgWorker()
+loginWorker.port.on("loginPerformed", function(value)
 {
-  //loads an invisible page in the background
-  pageWorker = require("sdk/page-worker").Page(
+  loggedIn = value;
+
+  if(Boolean(loggedIn))
   {
-    contentScriptFile: data.url("workerContentSCRIPT.js"),
-    contentURL: "https://foodsharing.de/",
+    console.log("login was successful. Attaching page-workers now");
+
+// PICKUP WORKER ____________________________________________________________________________
+
+    // retrieves pickup-dates chart from website
+    pickupWorker = require("sdk/page-worker").Page(
+    {
+    // contentScriptFile: data.url("pickupDatesWorker.js"),
+    contentScript: 'console.log("pickupWorker is updating"); self.port.emit("gotLatestPickupDates", document.querySelector("#right").innerHTML);',
+    contentURL: "https://foodsharing.de/?page=dashboard",
     contentScriptWhen: "end",
-    // onMessage: handleWorkerMessage
-  });
+    });
 
-  pageWorker.port.on("requestLogin", function()
-  {
-    console.log("pageWorker has requested login-command. sending request now");
-    // pageWorker.contentScriptWhen = "ready";
-    pageWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
-  });
+    pickupWorker.port.on("gotLatestPickupDates", function(element)
+    {
+      console.log("retrieved pickupDates. Updating variable");
+      pickupHTMLElement = element;
 
-  pageWorker.port.on("updateBadge", function(value)
-  {
-    console.log("received new value. updating button");
-    // button.badge = value;
-  });
+      console.log("trying to show panel now");
+      showPanel();
+    });
 
-  pageWorker.port.on("startInterval", function startInterval()
-  {
-      console.log("starting interval timer now");
-      intervalID = setInterval(function() 
+    console.log("pickupWorker created");
+
+
+// MESSAGES WORKER  ____________________________________________________________________________
+
+    console.log("setting createMsgWorker-function");
+
+    msgWorkerButton.on("click", createMsgWorker);
+
+    function createMsgWorker()
+    {
+      //loads an invisible page in the background
+      msgWorker = require("sdk/page-worker").Page(
       {
-        console.log("prompting pageWorker for refresh");
-        pageWorker.port.emit("refreshPage");
-        // pageWorker.contentURL = "https://foodsharing.de/?page=bcard";
-        // pageWorker.postMessage("refreshPageMessage");
-      }, 16000)
-  });
+        contentScriptFile: data.url("workerContentSCRIPT.js"),
+        contentURL: "https://foodsharing.de/",
+        contentScriptWhen: "end",
+        // onMessage: handleWorkerMessage
+      });
 
+      // not logged in (anymore?!)
+      msgWorker.port.on("requestLogin", function()
+      {
+        console.log("msgWorker has requested login-command. But we should be logged in. Please handle!");
+      });
+
+      // msgWorker should be ready ticks. Bring it on!
+      function startMsgUpdateInterval()
+      {
+          console.log("starting interval timer now");
+          intervalID = setInterval(function() 
+          {
+            console.log("reloading messageWorker's page");
+            msgWorker.contentURL = "https://foodsharing.de/?page=bcard";
+          }, 16000)
+      };
+
+      // reloading page has returned a value
+      msgWorker.port.on("updateBadge", function(value)
+      {
+        console.log("received new value. updating button");
+        button.badge = value;
+      });
+
+      console.log("creating message worker now");
+
+      // START INTERVAL TIMERS
+      // startMsgUpdateInterval();
+    }
+  }
+});
+
+// LOGIN BUTTON ____________________________________________________________________________
+
+var { ActionButton } = require("sdk/ui/button/action");
+var loginButton = ActionButton({
+  id: "Login",
+  icon: {
+    "16": "./MS-16.png",
+    "32": "./MS-32.png",
+    "64": "./Ms-64.png"
+  },
+  label: "LOGIN",
+  badgeColor: "#00AAAA",
+   onClick: requestLogin
+});
+
+function requestLogin()
+{
+  loginWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
 }
 
 // TOGGLE BUTTON ____________________________________________________________________________
 
-// Create a button
 var button = require("sdk/ui/button/toggle").ToggleButton({
   id: "show-panel",
   label: "Show Panel",
@@ -93,85 +173,67 @@ var button = require("sdk/ui/button/toggle").ToggleButton({
   onClick: handleChange
 });
 
-var pickupHTMLElement;
 
 // Show the panel when the user clicks the button.
-function handleChange(state) {
+function handleChange(state) 
+{
+  console.log("handle button change has been called");
   if(state.checked)
   {
+    if(Boolean(loggedIn))
+    {
+      console.log("trying to update pickupWorker by ...");
 
-    // reload page in worker and update pickupHTMLElement in return
-    console.log("updating pickupWorker");
-    pickupWorker.contentURL = "https://foodsharing.de/?page=dashboard";
-
-    // show panel and pass calender info
-    console.log("showing panel now");
-	  panel.show({position: button});
+      var recreate = true;
+      if(recreate)
+      {
+        console.log("...reconstruction");
+        pickupWorker.destroy();
+        pickupWorker = require("sdk/page-worker").Page(
+        {
+          // contentScriptFile: data.url("pickupDatesWorker.js"),
+          contentScript: 'console.log("pickupWorker is updating"); self.port.emit("gotLatestPickupDates", document.querySelector("#right").innerHTML);',
+          contentURL: "https://foodsharing.de/?page=dashboard",
+          contentScriptWhen: "end"
+        });
+      }
+      else
+      {
+        console.log("reloading");
+        pickupWorker.contentURL = "https://foodsharing.de/?page=dashboard";
+      }      
+    }
+    else
+    {
+      console.log("hold on a minute");
+      loginWorker.port.emit("login");
+    }
   }
   else
   {
-	  panel.hide();
+    panel.hide();
   }
-  // some extra stuff
-  tabs.open("https://foodsharing.de");
 }
-
-function handleHide()
-{
-	button.state('window', {checked: false});
-}
-
 
 // PANEL    ____________________________________________________________________________
 
-// Construct a panel and loading the script into it.
 var panel = require("sdk/panel").Panel({
-  contentURL: data.url("panelHTML"),
-  contentScriptFile: data.url("panelSCRIPT.js"),
-  onHide : handleHide
+contentURL: data.url("panelHTML.html"),
+contentScriptFile: data.url("panelSCRIPT.js"),
+onHide : function()
+  {
+      button.state('window', {checked: false});
+  }
 });
 
-// send "show" event to the panel's script
 panel.on("show", function() {
   panel.port.emit("show", pickupHTMLElement);
 });
 
-// Listen for messages called "text-entered" coming from
-// the content script.
-panel.port.on("text-entered", function (text) {
-  console.log(text);
-  panel.hide();
-});
-
-// PICKUP DATES WORKER ____________________________________________________________________________
-
-  loginWorker = require("sdk/page-worker").Page(
-    {
-      contentScriptFile:  data.url("workerLoginSCRIPT.js"),
-      contentURL: "https://www.foodsharing.de",
-      contentScriptWhen: "end"
-    }
-  );
-
-  loginWorker.port.on("loginPerformed", function()
-  {
-        // loads an invisible page in the background
-          // retrieves pickup dates dom-content from website
-          pickupWorker = require("sdk/page-worker").Page(
-          {
-            // contentScriptFile: data.url("pickupDatesWorker.js"),
-            contentScript: 'console.log("pickupWorker is updating"); self.port.emit("pickupDates", document.querySelector("#right > div:nth-child(1)"));',
-            contentURL: "https://foodsharing.de/?page=dashboard",
-            contentScriptWhen: "end",
-          });
-
-        pickupWorker.port.on("pickupDates", function(element)
-        {
-          console.log("retrieved pickupDates. Updating variable for later use");
-          pickupHTMLElement = element;
-        });
-  });
-
+function showPanel()
+{
+  panel.show({position: button});
+}
 
 // PAGE MOD     ____________________________________________________________________________
 
@@ -222,3 +284,9 @@ panel.port.on("text-entered", function (text) {
 // }
 
 // startXmlHttpRequest("https://foodsharing.de/");
+}
+catch (e)
+{
+  console.log("error code: ", e);
+}
+

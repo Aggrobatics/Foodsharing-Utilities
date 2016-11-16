@@ -17,12 +17,12 @@
 // // Set the focus to the text area so the user can
 // // just start typing.
 self.port.on("show", function(pickupDates) {
-  console.log("received show-command via self.port");
-  document.getElementById("pickupDates").innerHTML = "Hello World"; // pickupDates;
+  console.log("panel received show-command");
+  document.getElementById("pickupDates").innerHTML = pickupDates; // pickupDates;
 });
 
 // allegedly there is no self.port.on - functionality!?
-addon.port.on("show", function(pickupDates) {
-    console.log("received show-command via addon.port");
-    document.getElementById("pickupDates").innerHTML ="Hello World";// pickupDates;
-});
+// addon.port.on("show", function(pickupDates) {
+//     console.log("received show-command via ADDON.port");
+//     document.getElementById("pickupDates").innerHTML ="Hello World";// pickupDates;
+// });
