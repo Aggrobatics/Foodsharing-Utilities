@@ -16,7 +16,7 @@
 
 // // Set the focus to the text area so the user can
 // // just start typing.
-self.port.on("show", function(pickupDates) {
+self.port.on("fillPanel", function(pickupDates) {
   console.log("panel received show-command");
   document.getElementById("pickupDates").innerHTML = pickupDates; // pickupDates;
 });
