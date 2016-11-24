@@ -1,3 +1,35 @@
+// If you pass it a single property, only credentials matching that property are returned:
+
+// function show_passwords_for_joe() {
+//   require("sdk/passwords").search({
+//     url: "http://foodsharing.de",
+//     onComplete: function onComplete(credentials) {
+//       credentials.forEach(function(credential) {
+//         console.log(credential.username);
+//         console.log(credential.password);
+//         });
+//       }
+//     });
+//   }
+
+
+// To retrieve only credentials associated with your add-on, use the url property, initialized from self.uri:
+
+// function show_my_addon_passwords() {
+//   require("sdk/passwords").search({
+//     url: require("sdk/self").uri,
+//     onComplete: function onComplete(credentials) {
+//       credentials.forEach(function(credential) {
+//         console.log(credential.username);
+//         console.log(credential.password);
+//         });
+//       }
+//     });
+//   }
+
+
+
+
 try
 {
 
@@ -26,7 +58,7 @@ var b_loggedIn = false;
 // Test Switches
 var b_useMsgWorker = false;
 var b_usePickupWorker = false;
-var b_useFakeLogin = false;
+var b_useFakeLogin = true;
 
 // Login data
 if(b_useFakeLogin)
@@ -42,6 +74,7 @@ else
 
 // Functions
 var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
+
 
 // TABS         ____________________________________________________________________________
 
@@ -83,6 +116,33 @@ tabs.on('ready', function(tab)
       }
     }
   }
+  else if(tab.url.match("https://foodsharing.de*"))
+  {
+    // not logged in and on website. Check for a change in login-status
+    var loginChecker;
+    
+    // html-event-listener is declared above
+    loginChecker = tab.attach({
+      contentScript: 'self.port.emit("html", !Boolean(document.getElementById("loginbar")));'
+    });
+
+    // need to attach listener before attaching script to tab, since it will be executed immediately!
+    loginChecker.port.on("html", function(b_value)
+    {
+      console.log("received message from login checker");
+      console.log("Login Status: " + b_value);
+      if((b_loggedIn) && (!b_value))
+      {
+        b_loggedIn = false;
+        handleNewLogoff();
+      }
+      else if((!b_loggedIn) && (b_value))
+      {
+        b_loggedIn = true;
+        handleNewLogin();
+      }
+    });
+  }
 
   tabs.on("activate", function(tab)
   {
@@ -99,6 +159,224 @@ tabs.on('ready', function(tab)
   });
 
 });
+
+// MSGButton     ____________________________________________________________________________
+
+// console.log("creating msgWorkerButton");
+
+var { ActionButton } = require("sdk/ui/button/action");
+    var msgWorkerButton = ActionButton({
+      id: "create-message-worker",
+      icon: {
+        "16": "./icon-16.png",
+        "32": "./icon-32.png",
+        "64": "./icon-64.png"
+      },
+      label: "Create Message Worker (no interval)",
+      badgeColor: "#00AAAA",
+    });
+
+// LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
+
+// loginWorker.port.emit("login", email, pass);
+
+// console.log("creating loginWorker");
+
+loginWorker = require("sdk/page-worker").Page(
+{
+  contentScriptFile:  data.url("loginWorker.js"),
+  contentURL: "https://www.foodsharing.de",
+  contentScriptWhen: "end"
+});
+
+loginWorker.port.on("loginPerformed", function(value)
+{
+  b_loggedIn = value;
+
+  handleNewLogin();
+});
+
+// TOGGLE BUTTON ____________________________________________________________________________
+
+// console.log("creating ToggleButton");
+
+var button = require("sdk/ui/button/toggle").ToggleButton({
+  id: "show-panel",
+  label: "Show Panel",
+  icon: {
+    "16": "./gabel-16.png",
+    "32": "./gabel-32.png",
+    "64": "./gabel-64.png"
+  },
+	badge: 0,
+	badgeColor: "#00AAAA",
+  disabled: true,
+  onClick: handleButtonChange
+});
+
+
+// PANEL    ____________________________________________________________________________
+
+// console.log("creating panel");
+
+var panel = require("sdk/panel").Panel({
+contentURL: data.url("panelHTML.html"),
+contentScriptFile: data.url("panelSCRIPT.js"),
+onHide : function()
+  {
+      button.state('window', {checked: false});
+  }
+});
+
+// FUNCTION IMPLEMENTATIONS ____________________________________________________________________________
+
+function handleNewLogin()
+{
+  if(!b_loggedIn)
+    return;
+
+  console.log("handleNewLogin");
+
+  // the firefox addon API does not support close() on notifications
+  var notifications = require("sdk/notifications");
+  notifications.notify({
+    title: "foodsharing.de",
+    text: "You are now logged in!",
+    iconURL: data.url("gabel-64.png")
+  });
+
+  console.log("enabling button again");
+  button.disabled = false;
+  button.badgeColor = "#000000";
+
+  // START INTERVAL TIMERS
+  startMsgUpdateInterval();
+}
+
+function handleNewLogoff()
+{
+  console.log("handleNewLogoff");
+
+
+  b_loggedIn = false;
+  
+  clearInterval(msgIntervalID);
+  msgIntervalID = 0;
+
+  button.badgeColor = "#FFFFFF";
+  button.badge.value = undefined;
+  button.disabled = true;
+
+  stopBlinkInterval();
+}
+
+// Show the panel when the user clicks the button.
+function handleButtonChange(state) 
+{
+  console.log("handle button change has been called");
+  if(state.checked)
+  {
+    if(Boolean(b_loggedIn))
+    {
+      console.log("...sending pickupDates request");
+      utils.makeDocRequest("https://foodsharing.de/?page=dashboard", function(responseXML)
+      {
+        console.log("retrieved pickupDates. Updating variable");
+        pickupHTMLElement = responseXML.body.querySelector("#right").innerHTML;  
+        showPanel();
+      });
+    }
+    else
+    {
+      console.log("hold on a minute");
+      loginWorker.port.emit("login");
+    }
+  }
+  else
+  {
+    panel.hide();
+  }
+}
+
+function showPanel()
+{
+  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray);
+  panel.show({position: button});
+}
+
+function updateBadge(value)
+  {
+    if(value > button.badge)
+    {
+      console.log("value is greater than badge-value. adjusting...")
+      // unread messages have increased!
+      button.badgeColor = "#AA0000";
+      button.badge = value;
+      // handle blinking
+      if((foodsharingTabs.length > 0) && (!blinkIntervalID) && (value >0))
+      {
+        // there are open tabs that can blink and...
+        // blinkInterval is not yet running
+        stopBlinkInterval();
+        console.log("starting blink interval");
+        blinkIntervalID = setInterval(function() 
+        {
+          b_originalTabText = !b_originalTabText;
+          switchTabsTitles(b_originalTabText, value);
+        }, 3000)
+      }
+    }
+    else if(value < button.badge)
+    {
+      console.log("value is smaller than button.bdage! adjusting...")
+      button.badge = value;
+      // unread messages have decreased (by user action) and...
+      // blink interval is running
+      button.badgeColor = "#00AAAA";
+      stopBlinkInterval();
+    }
+  }
+
+  // msgWorker should be ready for ticks. Bring it on!
+  function startMsgUpdateInterval()
+  {
+      console.log("starting interval timer now");
+      msgIntervalID = setInterval(function() 
+      {
+        // MESSAGES
+        console.log("...sending msgPage request");
+          utils.makeDocRequest("https://foodsharing.de/?page=msg", function(responseXML)
+          {
+              handleMsgDocReload(responseXML);
+          },
+          function(){console.log("shit. request didnt work");});
+      }, 5000);
+  };
+
+  function handleMsgDocReload(document)
+  {
+    if(document.getElementById("conversation-list"))
+    {
+      // console.log("Found conversation-list!");
+      unreadMsgArray = document.getElementsByClassName("unread-1");
+      console.log("You have " + unreadMsgArray.length + " unread Messages");
+      updateBadge(unreadMsgArray.length);
+    }
+    else if(!utils.checkLoginWithDom(document))
+    {
+      console.log("loginbar found. Not logged in anymore");	
+      if(b_loggedIn)
+      {
+        handleNewLogoff();
+      }
+      
+      // requestLogin();
+    }
+    else
+    {
+      console.log("Something went terribly wrong. Found neither loginbar, nor badge!");
+    }
+  }  
 
 function stopBlinkInterval()
 {
@@ -131,300 +409,9 @@ function switchTabsTitles(value, messages)
   } 
 }
 
-// MSGButton     ____________________________________________________________________________
 
-console.log("creating msgWorkerButton");
-
-var { ActionButton } = require("sdk/ui/button/action");
-    var msgWorkerButton = ActionButton({
-      id: "create-message-worker",
-      icon: {
-        "16": "./icon-16.png",
-        "32": "./icon-32.png",
-        "64": "./icon-64.png"
-      },
-      label: "Create Message Worker (no interval)",
-      badgeColor: "#00AAAA",
-    });
-
-// LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
-
-// loginWorker.port.emit("login", email, pass);
-
-console.log("creating loginWorker");
-
-loginWorker = require("sdk/page-worker").Page(
-{
-  contentScriptFile:  data.url("loginWorker.js"),
-  contentURL: "https://www.foodsharing.de",
-  contentScriptWhen: "end"
-});
-
-loginWorker.port.on("loginPerformed", function(value)
-{
-  b_loggedIn = value;
-
-  if(Boolean(b_loggedIn))
-  {
-    console.log("login was successful. Attaching page-workers now");
-
-    var notifications = require("sdk/notifications");
-    notifications.notify({
-      title: "foodsharing.de",
-      text: "You are now logged in!",
-      iconURL: data.url("gabel-64.png")
-    });
-
-    /*
-    * the firefox addon API does not support close() on notifications
-    */
-
-
-// MESSAGES WORKER  ____________________________________________________________________________
-
-    console.log("setting createMsgWorker"); //-function");
-
-    // msgWorkerButton.on("click", createMsgWorker);
-
-    // function createMsgWorker()
-    // {
-
-      console.log("creating message worker now");
-
-      //loads an invisible page in the background
-      msgWorker = require("sdk/page-worker").Page(
-      {
-        contentScriptFile: data.url("messageWorker.js"),
-        contentURL: "https://foodsharing.de/",
-        contentScriptWhen: "end",
-      });
-
-      // not logged in (anymore?!)
-      msgWorker.port.on("requestLogin", function()
-      {
-        console.log("msgWorker has requested login");
-        requestLogin();
-      });
-
-      // reloading page has returned a value
-      msgWorker.port.on("updateBadge", function(value) {updateBadge(value)});
-
-      function updateBadge(value)
-      {
-        console.log("updateBadge-event received");
-        if(value > button.badge)
-        {
-          // unread messages have increased!
-          // handle blinking
-          if((foodsharingTabs.length > 0) && (!blinkIntervalID) && (value >0))
-          {
-            // there are open tabs that can blink and...
-            // blinkInterval is not yet running
-            stopBlinkInterval();
-            console.log("starting blink interval");
-            blinkIntervalID = setInterval(function() 
-            {
-              b_originalTabText = !b_originalTabText;
-              switchTabsTitles(b_originalTabText, value);
-            }, 3000)
-          }
-        }
-        else if(value < button.badge)
-        {
-          // unread messages have decreased (by user action) and...
-          // blink interval is running
-          stopBlinkInterval();
-        }
-        console.log("adjusting badge now");
-        button.badge = value;
-      }
-
-      // msgWorker should be ready for ticks. Bring it on!
-      function startMsgUpdateInterval()
-      {
-          console.log("starting interval timer now");
-          msgIntervalID = setInterval(function() 
-          {
-            // MESSAGES
-            console.log("trying to reload messageWorker's page by...");
-
-            // testing purposes
-            if(b_useMsgWorker)
-            {
-              console.log("...resetting URL");
-              msgWorker.contentURL = "https://foodsharing.de/?page=bcard";
-            }
-            // this part does not work as msgWorker throws domExceptions
-            // when trying to work with the new text
-            else
-            {
-              console.log("...sending request");
-              utils.makeDocRequest("https://foodsharing.de/?page=msg", function(responseXML)
-              {
-                  handleMsgDocReload(responseXML);
-              },
-              function(){console.log("shit. request didnt work");});
-            }
-          }, 5000)
-      };
-
-      function handleMsgDocReload(document)
-      {
-        if(document.getElementById("conversation-list"))
-        {
-          console.log("Found conversation-list!");
-          unreadMsgArray = document.getElementsByClassName("unread-1");
-          console.log("You have " + unreadMsgArray.length + " unread Messages");
-      
-          console.log(outputText);
-
-          updateBadge(unreadMsgArray.length);
-        }
-        else if(document.getElementById("loginbar"))
-        {
-          console.log("loginbar found. Request login and deregister msgIntervalID");	
-          clearInterval(msgIntervalID);
-          msgIntervalID = 0;
-          
-          requestLogin();
-        }
-        else
-        {
-          console.log("Something went terribly wrong. Found neither loginbar, nor badge!");
-        }
-      }
-
-      // START INTERVAL TIMERS
-      startMsgUpdateInterval();
-      
-    // }
-
-    // PICKUP WORKER ____________________________________________________________________________
-
-    console.log("creating pickupWorker");
-
-    // retrieves pickup-dates chart from website
-    pickupWorker = require("sdk/page-worker").Page(
-    {
-    // contentScriptFile: data.url("pickupDatesWorker.js"),
-    contentScript: 'console.log("pickupWorker is updating"); self.port.emit("gotLatestPickupDates", document.querySelector("#right").innerHTML);',
-    contentURL: "https://foodsharing.de/?page=dashboard",
-    contentScriptWhen: "end",
-    });
-
-    pickupWorker.port.on("gotLatestPickupDates", function(element)
-    {
-      console.log("retrieved pickupDates. Updating variable");
-      pickupHTMLElement = element;
-
-      console.log("trying to show panel now");
-      showPanel();
-    });
-
-  }
-});
-
-// LOGIN BUTTON ____________________________________________________________________________
-
-console.log("creating login button");
-
-var { ActionButton } = require("sdk/ui/button/action");
-var loginButton = ActionButton({
-  id: "Login",
-  icon: {
-    "16": "./MS-16.png",
-    "32": "./MS-32.png",
-    "64": "./Ms-64.png"
-  },
-  label: "LOGIN",
-  badgeColor: "#00AAAA",
-   onClick: requestLogin
-});
-
-function requestLogin()
-{
-  b_loggedIn = false;
-  loginWorker.port.emit("login", email, "wegwerfpasswort");
-}
-
-// TOGGLE BUTTON ____________________________________________________________________________
-
-console.log("creating ToggleButton");
-
-var button = require("sdk/ui/button/toggle").ToggleButton({
-  id: "show-panel",
-  label: "Show Panel",
-  icon: {
-    "16": "./gabel-16.png",
-    "32": "./gabel-32.png",
-    "64": "./gabel-64.png"
-  },
-	badge: 0,
-	badgeColor: "#00AAAA",
-  onClick: handleChange
-});
-
-
-// Show the panel when the user clicks the button.
-function handleChange(state) 
-{
-  console.log("handle button change has been called");
-  if(state.checked)
-  {
-    if(Boolean(b_loggedIn))
-    {
-      console.log("trying to update pickupWorker by ...");
-
-      if(b_usePickupWorker)
-      {
-        console.log("...reloading");
-        pickupWorker.contentURL = "https://foodsharing.de/?page=dashboard";
-      }
-      else
-      {
-        console.log("...sending request");
-        utils.makeDocRequest("https://foodsharing.de/?page=dashboard", function(responseXML)
-        {
-          console.log("retrieved pickupDates. Updating variable");
-          pickupHTMLElement = responseXML.body.querySelector("#right").innerHTML;  
-          showPanel();
-        })
-      }      
-    }
-    else
-    {
-      console.log("hold on a minute");
-      loginWorker.port.emit("login");
-    }
-  }
-  else
-  {
-    panel.hide();
-  }
-}
-
-
-// PANEL    ____________________________________________________________________________
-
-console.log("creating panel");
-
-var panel = require("sdk/panel").Panel({
-contentURL: data.url("panelHTML.html"),
-contentScriptFile: data.url("panelSCRIPT.js"),
-onHide : function()
-  {
-      button.state('window', {checked: false});
-  }
-});
-
-function showPanel()
-{
-  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray);
-  panel.show({position: button});
-}
-
-  loginWorker.port.emit("login", email, pass);
-  // tabs.open("https://foodsharing.de");
+  tabs.open("https://foodsharing.de");
+  // loginWorker.port.emit("login", email, pass);
 }
 catch (e)
 {

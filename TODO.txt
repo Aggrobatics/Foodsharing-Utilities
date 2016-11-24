@@ -1,0 +1,3 @@
+Füge alle foodsharing tabs bei handleNewLogin() zum array hinzu
+check for login when foodsharing tab is loaded and not logged in (manual login listener)
+read user data from firefox password list

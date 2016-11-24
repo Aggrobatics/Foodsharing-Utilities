@@ -28,7 +28,7 @@ exports.makeDocRequest = function(url, onSuccess, onError)
         if (httpRequest.readyState === XMLHttpRequest.DONE) {
             if (httpRequest.status === 200) 
             {
-                console.log("HttpRequest has returned as DONE");
+                // console.log("HttpRequest has returned as DONE");
                 // document.documentElement
                 // or document.body
                 onSuccess(this.responseXML); 
@@ -50,7 +50,19 @@ exports.makeDocRequest = function(url, onSuccess, onError)
 
 // TESTING ____________________________________________________________________________
 
-  exports.testFunction = function(text)
+exports.testFunction = function(text)
 {
     console.log("utils function has been called with text: " + text);
+}
+
+exports.checkLoginWithDom = function(document)
+{
+    if(document.getElementById("loginbar"))
+    {
+        return false;
+    }
+    else
+    {
+        return true;
+    }
 }
