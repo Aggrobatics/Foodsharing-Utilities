@@ -3,41 +3,52 @@ try
 
 var data = require("sdk/self").data;
 var utils = require("./data/utils");
-var loggedIn = 0;
+
+// Objects
 var pickupHTMLElement;
 var tabs = require("sdk/tabs");
 var panel;
+
+// Arrays
 var foodsharingTabs = [];
+var unreadMsgArray = [];
+
+// Numbers
 var msgIntervalID;
 var blinkIntervalID;
+var failedLogins = 0;
+
+// Bools
 var b_originalTabText;
 var b_addonStart = true;
+var b_loggedIn = false;
+
+// Test Switches
+var b_useMsgWorker = false;
+var b_usePickupWorker = false;
+var b_useFakeLogin = false;
+
+// Login data
+if(b_useFakeLogin)
+{
+  var email = "max.dusemund@trash-mail.com";
+  var pass = "wegwerfpasswort";
+}
+else
+{
+  var email = "markus.schmieder@gmx.de";
+  var pass = "Joe5023234";
+}
+
+// Functions
 var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
 
-
-// utils.makeRequest("http://foodsharing.de", function(responseXML)
-utils.makeRequest("http://semantic-ui.com/examples/responsive.html", function(responseXML)
-{
-  console.log("onSuccess func in index.js has been called");
-  console.log(this.responseXML.body.textContent);
-
-  // console.log(responseXML); // .querySelector(".msg > a:nth-child(1) > span:nth-child(2)").innerHTML);
-},
-function(){console.log("shit. request didnt work");});
-
-
-
 // TABS         ____________________________________________________________________________
-
-// tabs.open("foodsharing.de");
-
-// called every time a tab loads and is ready
-// prints the new url in console
 
 tabs.on("close", function(tab)
 {
   var index = foodsharingTabs.indexOf(tab);
-  if ((loggedIn) && (Boolean(index+1)))
+  if ((b_loggedIn) && (Boolean(index+1)))
   {
     foodsharingTabs.splice(index, 1);
     console.log("foodsharingTab closed. Array: " + foodsharingTabs);
@@ -49,7 +60,7 @@ tabs.on('ready', function(tab)
   if(tab.url == "about:blank") {
     console.log("CRASHED");
   }
-  else if (loggedIn) {
+  else if (b_loggedIn) {
     // returns -1 if element is not in Array
     var index = foodsharingTabs.indexOf(tab);
 
@@ -138,7 +149,7 @@ var { ActionButton } = require("sdk/ui/button/action");
 
 // LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
 
-// loginWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
+// loginWorker.port.emit("login", email, pass);
 
 console.log("creating loginWorker");
 
@@ -151,9 +162,9 @@ loginWorker = require("sdk/page-worker").Page(
 
 loginWorker.port.on("loginPerformed", function(value)
 {
-  loggedIn = value;
+  b_loggedIn = value;
 
-  if(Boolean(loggedIn))
+  if(Boolean(b_loggedIn))
   {
     console.log("login was successful. Attaching page-workers now");
 
@@ -196,7 +207,9 @@ loginWorker.port.on("loginPerformed", function(value)
       });
 
       // reloading page has returned a value
-      msgWorker.port.on("updateBadge", function(value)
+      msgWorker.port.on("updateBadge", function(value) {updateBadge(value)});
+
+      function updateBadge(value)
       {
         console.log("updateBadge-event received");
         if(value > button.badge)
@@ -224,7 +237,7 @@ loginWorker.port.on("loginPerformed", function(value)
         }
         console.log("adjusting badge now");
         button.badge = value;
-      });
+      }
 
       // msgWorker should be ready for ticks. Bring it on!
       function startMsgUpdateInterval()
@@ -235,9 +248,8 @@ loginWorker.port.on("loginPerformed", function(value)
             // MESSAGES
             console.log("trying to reload messageWorker's page by...");
 
-            var useURL = true;
             // testing purposes
-            if(useURL)
+            if(b_useMsgWorker)
             {
               console.log("...resetting URL");
               msgWorker.contentURL = "https://foodsharing.de/?page=bcard";
@@ -247,17 +259,40 @@ loginWorker.port.on("loginPerformed", function(value)
             else
             {
               console.log("...sending request");
-              var httpRequest = RequestClass({
-              url: "https://foodsharing.de/?page=bcard",
-              onComplete: function (response) {
-                msgWorker.port.emit("update", response.text);
-              }
-              });
-              console.log("sending out request now");
-              httpRequest.get();
+              utils.makeDocRequest("https://foodsharing.de/?page=msg", function(responseXML)
+              {
+                  handleMsgDocReload(responseXML);
+              },
+              function(){console.log("shit. request didnt work");});
             }
           }, 5000)
       };
+
+      function handleMsgDocReload(document)
+      {
+        if(document.getElementById("conversation-list"))
+        {
+          console.log("Found conversation-list!");
+          unreadMsgArray = document.getElementsByClassName("unread-1");
+          console.log("You have " + unreadMsgArray.length + " unread Messages");
+      
+          console.log(outputText);
+
+          updateBadge(unreadMsgArray.length);
+        }
+        else if(document.getElementById("loginbar"))
+        {
+          console.log("loginbar found. Request login and deregister msgIntervalID");	
+          clearInterval(msgIntervalID);
+          msgIntervalID = 0;
+          
+          requestLogin();
+        }
+        else
+        {
+          console.log("Something went terribly wrong. Found neither loginbar, nor badge!");
+        }
+      }
 
       // START INTERVAL TIMERS
       startMsgUpdateInterval();
@@ -308,8 +343,8 @@ var loginButton = ActionButton({
 
 function requestLogin()
 {
-  loggedIn = false;
-  loginWorker.port.emit("login", "max.dusemund@trash-mail.com", "wegwerfpasswort");
+  b_loggedIn = false;
+  loginWorker.port.emit("login", email, "wegwerfpasswort");
 }
 
 // TOGGLE BUTTON ____________________________________________________________________________
@@ -336,27 +371,24 @@ function handleChange(state)
   console.log("handle button change has been called");
   if(state.checked)
   {
-    if(Boolean(loggedIn))
+    if(Boolean(b_loggedIn))
     {
       console.log("trying to update pickupWorker by ...");
 
-      var recreate = false;
-      if(recreate)
-      {
-        console.log("...reconstruction");
-        pickupWorker.destroy();
-        pickupWorker = require("sdk/page-worker").Page(
-        {
-          // contentScriptFile: data.url("pickupDatesWorker.js"),
-          contentScript: 'console.log("pickupWorker is updating"); self.port.emit("gotLatestPickupDates", document.querySelector("#right").innerHTML);',
-          contentURL: "https://foodsharing.de/?page=dashboard",
-          contentScriptWhen: "end"
-        });
-      }
-      else
+      if(b_usePickupWorker)
       {
         console.log("...reloading");
         pickupWorker.contentURL = "https://foodsharing.de/?page=dashboard";
+      }
+      else
+      {
+        console.log("...sending request");
+        utils.makeDocRequest("https://foodsharing.de/?page=dashboard", function(responseXML)
+        {
+          console.log("retrieved pickupDates. Updating variable");
+          pickupHTMLElement = responseXML.body.querySelector("#right").innerHTML;  
+          showPanel();
+        })
       }      
     }
     else
@@ -387,11 +419,11 @@ onHide : function()
 
 function showPanel()
 {
-  panel.port.emit("fillPanel", pickupHTMLElement);
+  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray);
   panel.show({position: button});
 }
 
-  loginWorker.port.emit("login", "markus.schmieder@gmx.de", "Joe5023234");
+  loginWorker.port.emit("login", email, pass);
   // tabs.open("https://foodsharing.de");
 }
 catch (e)

@@ -16,9 +16,16 @@
 
 // // Set the focus to the text area so the user can
 // // just start typing.
-self.port.on("fillPanel", function(pickupDates) {
+self.port.on("fillPanel", function(pickupDates, messages) {
   console.log("panel received show-command");
   document.getElementById("pickupDates").innerHTML = pickupDates; // pickupDates;
+  var tmp;
+  for(var i = 0 ; i < messages.length; i++)
+  {
+    tmp += messages[i].outerHTML;
+  }
+  console.log("there you go: " + tmp);
+  document.getElementById("messages").innerHTML = tmp;
 });
 
 // allegedly there is no self.port.on - functionality!?

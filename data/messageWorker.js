@@ -1,5 +1,5 @@
 
-console.log("message worker is updating");
+console.log("message worker is updating. THIS SHOULD ONLY HAPPEN ONCE");
 
 var css_badge;
 
@@ -8,12 +8,8 @@ var css_badge;
 if(document.querySelector(".msg > a:nth-child(1) > span:nth-child(2)"))//.getElementsByClassName("msg").getElementsByClassName("badge"))
 {
 	console.log("Found the Badge!");
-
-	// get the observer target
 	css_badge = document.querySelector(".msg > a:nth-child(1) > span:nth-child(2)");
-
 	console.log("There are currently " + css_badge.innerHTML + " unread messages");
-
 	self.port.emit("updateBadge", css_badge.innerHTML);
 }
 else if(document.getElementById("loginbar"))

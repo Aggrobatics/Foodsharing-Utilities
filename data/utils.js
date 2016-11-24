@@ -4,17 +4,18 @@ var privateBrowsing = require("sdk/private-browsing");
 
 // REQUESTS ____________________________________________________________________________
 
-exports.makeRequest = function(url, onSuccess, onError) 
+exports.makeDocRequest = function(url, onSuccess, onError) 
 {
-    var httpRequest = new XMLHttpRequest(); 
+    var config = {};
+     if(privateBrowsing.isPrivate(browserWindows.activeWindow))
+        config.mozAnon = true;
+
+    var httpRequest = new XMLHttpRequest(config); 
     if (!httpRequest) {
       console.log("creation of httpRequest failed");
       return false;
     }
     // handle private browsing
-    var config = {};
-     if(privateBrowsing.isPrivate(browserWindows.activeWindow))
-        cfg.mozAnon = true;
 
     // ON SUCCESS
     httpRequest.onLoad = function() 
@@ -24,7 +25,6 @@ exports.makeRequest = function(url, onSuccess, onError)
     };
     httpRequest.onreadystatechange = function() 
     {    
-        console.log("onReadyStateChange");
         if (httpRequest.readyState === XMLHttpRequest.DONE) {
             if (httpRequest.status === 200) 
             {
