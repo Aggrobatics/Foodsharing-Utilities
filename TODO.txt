@@ -1,3 +1,6 @@
-Füge alle foodsharing tabs bei handleNewLogin() zum array hinzu
-check for login when foodsharing tab is loaded and not logged in (manual login listener)
-read user data from firefox password list
+HTML CHECKBOX Kommunikation einrichten
+auto login funktion
+login funktion
+json settings datei
+css design
+nachrichten im panel anzeigen

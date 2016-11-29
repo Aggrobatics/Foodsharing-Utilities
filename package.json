@@ -12,5 +12,11 @@
   "license": "MIT",
   "keywords": [
     "jetpack"
-  ]
+  ],
+    "preferences": [{
+        "name": "autoLogin",
+        "title": "Automatic Login",
+        "type": "bool",
+        "value": false
+    }]
 }

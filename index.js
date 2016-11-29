@@ -1,35 +1,3 @@
-// If you pass it a single property, only credentials matching that property are returned:
-
-// function show_passwords_for_joe() {
-//   require("sdk/passwords").search({
-//     url: "http://foodsharing.de",
-//     onComplete: function onComplete(credentials) {
-//       credentials.forEach(function(credential) {
-//         console.log(credential.username);
-//         console.log(credential.password);
-//         });
-//       }
-//     });
-//   }
-
-
-// To retrieve only credentials associated with your add-on, use the url property, initialized from self.uri:
-
-// function show_my_addon_passwords() {
-//   require("sdk/passwords").search({
-//     url: require("sdk/self").uri,
-//     onComplete: function onComplete(credentials) {
-//       credentials.forEach(function(credential) {
-//         console.log(credential.username);
-//         console.log(credential.password);
-//         });
-//       }
-//     });
-//   }
-
-
-
-
 try
 {
 
@@ -40,6 +8,8 @@ var utils = require("./data/utils");
 var pickupHTMLElement;
 var tabs = require("sdk/tabs");
 var panel;
+var notifications = require("sdk/notifications");
+
 
 // Arrays
 var foodsharingTabs = [];
@@ -54,6 +24,8 @@ var failedLogins = 0;
 var b_originalTabText;
 var b_addonStart = true;
 var b_loggedIn = false;
+var b_passwordPresent = true;
+var b_autoLogin = true;
 
 // Test Switches
 var b_useMsgWorker = false;
@@ -61,16 +33,21 @@ var b_usePickupWorker = false;
 var b_useFakeLogin = true;
 
 // Login data
+
+var email;
+var pass;
+
 if(b_useFakeLogin)
 {
+  b_passwordPresent = true;
   var email = "max.dusemund@trash-mail.com";
   var pass = "wegwerfpasswort";
 }
-else
-{
-  var email = "markus.schmieder@gmx.de";
-  var pass = "Joe5023234";
-}
+// else
+// {
+//   var email = "markus.schmieder@gmx.de";
+//   var pass = "Joe5023234";
+// }
 
 // Functions
 var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
@@ -80,6 +57,7 @@ var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
 
 tabs.on("close", function(tab)
 {
+  console.log("tab has been closed");
   var index = foodsharingTabs.indexOf(tab);
   if ((b_loggedIn) && (Boolean(index+1)))
   {
@@ -93,37 +71,36 @@ tabs.on('ready', function(tab)
   if(tab.url == "about:blank") {
     console.log("CRASHED");
   }
-  else if (b_loggedIn) {
-    // returns -1 if element is not in Array
-    var index = foodsharingTabs.indexOf(tab);
+  // returns -1 if element is not in Array
+  var index = foodsharingTabs.indexOf(tab);
 
-    // tab is in array (0 equals to false)
-    if (Boolean(index+1)) {
-      // ...and does not match website anymore
-      if(!tab.url.match("https://foodsharing.de*")) {
-        // remove tab
-        foodsharingTabs.splice( index, 1 );
-        console.log("New tabArray after remove: " + foodsharingTabs);
-      }
-    }
-    // tab is not in array
-    else {
-      // ...and matches website
-      if (tab.url.match("https://foodsharing.de*")) {
-        // add tab
-        foodsharingTabs.push(tab);
-        console.log("New tabArray after add: " + foodsharingTabs);
-      }
+  // tab is in array (0 equals to false)
+  if (Boolean(index+1)) {
+    // ...and does not match website anymore
+    if(!tab.url.match("https://foodsharing.de*")) {
+      // remove tab
+      foodsharingTabs.splice( index, 1 );
+      console.log("New tabArray after remove: " + foodsharingTabs);
     }
   }
-  else if(tab.url.match("https://foodsharing.de*"))
+  // tab is not in array
+  else {
+    // ...and matches website
+    if (tab.url.match("https://foodsharing.de*")) {
+      // add tab
+      foodsharingTabs.push(tab);
+      console.log("New tabArray after add: " + foodsharingTabs);
+    }
+  }
+
+  if(tab.url.match("https://foodsharing.de*"))
   {
-    // not logged in and on website. Check for a change in login-status
+    // on website. Check for a change in login-status
     var loginChecker;
     
     // html-event-listener is declared above
     loginChecker = tab.attach({
-      contentScript: 'self.port.emit("html", !Boolean(document.getElementById("loginbar")));'
+      contentScript: 'console.log("loginChecker is checking for new login!"); self.port.emit("html", !Boolean(document.getElementById("loginbar")));'
     });
 
     // need to attach listener before attaching script to tab, since it will be executed immediately!
@@ -178,8 +155,6 @@ var { ActionButton } = require("sdk/ui/button/action");
 
 // LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
 
-// loginWorker.port.emit("login", email, pass);
-
 // console.log("creating loginWorker");
 
 loginWorker = require("sdk/page-worker").Page(
@@ -210,7 +185,6 @@ var button = require("sdk/ui/button/toggle").ToggleButton({
   },
 	badge: 0,
 	badgeColor: "#00AAAA",
-  disabled: true,
   onClick: handleButtonChange
 });
 
@@ -228,6 +202,16 @@ onHide : function()
   }
 });
 
+panel.port.on("login", function(){
+  console.log("received button click");
+  getPasswordsForFsAndLogin();
+});
+
+panel.port.on("autoLoginChanged", function(autoLogin){
+  console.log("auto login changed to: " + autoLogin);
+  b_autoLogin = autoLogin;
+});
+
 // FUNCTION IMPLEMENTATIONS ____________________________________________________________________________
 
 function handleNewLogin()
@@ -235,10 +219,11 @@ function handleNewLogin()
   if(!b_loggedIn)
     return;
 
+  console.log("handleNewLogin()")
+
   console.log("handleNewLogin");
 
   // the firefox addon API does not support close() on notifications
-  var notifications = require("sdk/notifications");
   notifications.notify({
     title: "foodsharing.de",
     text: "You are now logged in!",
@@ -257,7 +242,6 @@ function handleNewLogoff()
 {
   console.log("handleNewLogoff");
 
-
   b_loggedIn = false;
   
   clearInterval(msgIntervalID);
@@ -265,14 +249,14 @@ function handleNewLogoff()
 
   button.badgeColor = "#FFFFFF";
   button.badge.value = undefined;
-  button.disabled = true;
+  // button.disabled = true;
 
   stopBlinkInterval();
 }
 
 // Show the panel when the user clicks the button.
 function handleButtonChange(state) 
-{
+{    
   console.log("handle button change has been called");
   if(state.checked)
   {
@@ -288,8 +272,8 @@ function handleButtonChange(state)
     }
     else
     {
-      console.log("hold on a minute");
-      loginWorker.port.emit("login");
+      pickupHTMLElement = "You are not logged in!";
+      showPanel();
     }
   }
   else
@@ -300,7 +284,7 @@ function handleButtonChange(state)
 
 function showPanel()
 {
-  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray);
+  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray, b_autoLogin);
   panel.show({position: button});
 }
 
@@ -402,16 +386,51 @@ function switchTabsTitles(value, messages)
   else
     blinkText = "Foodsharing | Restlos Gluecklich";
 
-  console.log("changing tabs' titles to '" + blinkText + "'");
+  // console.log("changing tabs' titles to '" + blinkText + "'");
 
   for (i = 0; i < foodsharingTabs.length; i++) {
     foodsharingTabs[i].title = blinkText;
   } 
 }
 
+// If you pass it a single property, only credentials matching that property are returned:
+function getPasswordsForFsAndLogin() {
+  require("sdk/passwords").search({
+    url: "https://foodsharing.de",
+    onComplete: function onComplete(credentials) {
+      if(credentials.length > 0)
+      {
+        console.log("there are saved passwords!");
+        b_passwordPresent = true;
+        email = credentials[0].username;
+        pass = credentials[0].password;
 
-  tabs.open("https://foodsharing.de");
+        loginWorker.port.emit("login", email, pass);
+      }
+      else
+      {
+        console.log("there are NO saved passwords!");
+        notifications.notify({
+        title: "foodsharing.de",
+        text: "Cannot find login data! \nPlease make sure you have stored your login data with Firefox \nto use the App's login function (Master Password is recommended!)",
+        iconURL: data.url("gabel-64.png")
+        });
+      }
+    }
+    });
+  }
+
+
+// ACTIONS ____________________________________________________________________________
+
+  // if(b_autoLogin)
+  //   getPasswordsForFsAndLogin();
+
+
+// EXTRAS and DEBUGGING____________________________________________________________________________
   // loginWorker.port.emit("login", email, pass);
+  tabs.open("https://foodsharing.de");
+
 }
 catch (e)
 {
