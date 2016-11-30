@@ -17,6 +17,14 @@
         "name": "autoLogin",
         "title": "Automatic Login",
         "type": "bool",
-        "value": false
-    }]
+        "value": true,
+		"description": "When active, the Addon will try to automatically login to https://foodsharing.de on Browser startup"
+    },
+	{
+		"name": "notification",
+		"title": "Notification Time:",
+		"description": "To receive notifications for upcoming pickup dates, set how many minutes in advance you would like to be notified (0 disables any notifications; only works on a running Browser)",
+		"type": "integer",
+		"value": 0
+	}]
 }

@@ -4,7 +4,7 @@ document.getElementById("loginButton").onclick = function(){
 };
 
 var autoLoginCheckbox = document.getElementById("autoLogin");
-console.log("autoLoginCheckbox: " + autoLoginCheckbox);
+
 autoLoginCheckbox.onChange = function(){
   console.log("registered checkbox onChange");
   // self.port.emit("autoLoginChanged", autoLoginCheckbox.checked);
@@ -24,7 +24,6 @@ autoLoginCheckbox.click = function(){
   console.log("registered checkbox click");
   // self.port.emit("autoLoginChanged", autoLoginCheckbox.checked);
 };
-
 
 
 

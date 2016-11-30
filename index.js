@@ -3,6 +3,7 @@ try
 
 var data = require("sdk/self").data;
 var utils = require("./data/utils");
+var settings = require("sdk/simple-prefs").prefs;
 
 // Objects
 var pickupHTMLElement;
@@ -25,29 +26,21 @@ var b_originalTabText;
 var b_addonStart = true;
 var b_loggedIn = false;
 var b_passwordPresent = true;
-var b_autoLogin = true;
 
 // Test Switches
-var b_useMsgWorker = false;
-var b_usePickupWorker = false;
 var b_useFakeLogin = true;
 
 // Login data
 
 var email;
 var pass;
-
+                                                                              // REMOVE THIS LATER ON!
 if(b_useFakeLogin)
 {
   b_passwordPresent = true;
   var email = "max.dusemund@trash-mail.com";
   var pass = "wegwerfpasswort";
 }
-// else
-// {
-//   var email = "markus.schmieder@gmx.de";
-//   var pass = "Joe5023234";
-// }
 
 // Functions
 var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
@@ -100,13 +93,12 @@ tabs.on('ready', function(tab)
     
     // html-event-listener is declared above
     loginChecker = tab.attach({
-      contentScript: 'console.log("loginChecker is checking for new login!"); self.port.emit("html", !Boolean(document.getElementById("loginbar")));'
+      contentScript: 'self.port.emit("html", !Boolean(document.getElementById("loginbar")));'
     });
 
     // need to attach listener before attaching script to tab, since it will be executed immediately!
     loginChecker.port.on("html", function(b_value)
     {
-      console.log("received message from login checker");
       console.log("Login Status: " + b_value);
       if((b_loggedIn) && (!b_value))
       {
@@ -137,38 +129,23 @@ tabs.on('ready', function(tab)
 
 });
 
-// MSGButton     ____________________________________________________________________________
-
-// console.log("creating msgWorkerButton");
-
-var { ActionButton } = require("sdk/ui/button/action");
-    var msgWorkerButton = ActionButton({
-      id: "create-message-worker",
-      icon: {
-        "16": "./icon-16.png",
-        "32": "./icon-32.png",
-        "64": "./icon-64.png"
-      },
-      label: "Create Message Worker (no interval)",
-      badgeColor: "#00AAAA",
-    });
-
 // LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
 
-// console.log("creating loginWorker");
+console.log("creating loginWorker");
 
 loginWorker = require("sdk/page-worker").Page(
 {
   contentScriptFile:  data.url("loginWorker.js"),
-  contentURL: "https://www.foodsharing.de",
+  contentURL: "https://www.foodsharing.de/",
   contentScriptWhen: "end"
 });
+
 
 loginWorker.port.on("loginPerformed", function(value)
 {
   b_loggedIn = value;
-
-  handleNewLogin();
+  if(value)
+    handleNewLogin();
 });
 
 // TOGGLE BUTTON ____________________________________________________________________________
@@ -209,7 +186,7 @@ panel.port.on("login", function(){
 
 panel.port.on("autoLoginChanged", function(autoLogin){
   console.log("auto login changed to: " + autoLogin);
-  b_autoLogin = autoLogin;
+  settings.autoLogin = autoLogin;
 });
 
 // FUNCTION IMPLEMENTATIONS ____________________________________________________________________________
@@ -217,11 +194,14 @@ panel.port.on("autoLoginChanged", function(autoLogin){
 function handleNewLogin()
 {
   if(!b_loggedIn)
+  {
+    console.log("something went pretty wrong here mate");
     return;
+  }
+
+  checkUpcomingPickups();
 
   console.log("handleNewLogin()")
-
-  console.log("handleNewLogin");
 
   // the firefox addon API does not support close() on notifications
   notifications.notify({
@@ -284,7 +264,7 @@ function handleButtonChange(state)
 
 function showPanel()
 {
-  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray, b_autoLogin);
+  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray, settings.autoLogin);
   panel.show({position: button});
 }
 
@@ -321,7 +301,6 @@ function updateBadge(value)
     }
   }
 
-  // msgWorker should be ready for ticks. Bring it on!
   function startMsgUpdateInterval()
   {
       console.log("starting interval timer now");
@@ -395,7 +374,16 @@ function switchTabsTitles(value, messages)
 
 // If you pass it a single property, only credentials matching that property are returned:
 function getPasswordsForFsAndLogin() {
-  require("sdk/passwords").search({
+  console.log("getPasswordsForFsAndLogin()");
+  if(b_passwordPresent)
+  {
+    console.log("b_passwordPresent = true. Sending fake login now");
+    loginWorker.port.emit("login", email, pass);
+    return;
+  }
+  else
+  {
+    require("sdk/passwords").search({
     url: "https://foodsharing.de",
     onComplete: function onComplete(credentials) {
       if(credentials.length > 0)
@@ -406,30 +394,40 @@ function getPasswordsForFsAndLogin() {
         pass = credentials[0].password;
 
         loginWorker.port.emit("login", email, pass);
+        return;
       }
       else
       {
         console.log("there are NO saved passwords!");
         notifications.notify({
-        title: "foodsharing.de",
-        text: "Cannot find login data! \nPlease make sure you have stored your login data with Firefox \nto use the App's login function (Master Password is recommended!)",
-        iconURL: data.url("gabel-64.png")
+          title: "foodsharing.de",
+          text: "Cannot find login data! Please make sure you have stored your login data with Firefox to use the App's login function (Master Password is recommended!)",
+          iconURL: data.url("gabel-64.png")
         });
+        return;
       }
     }
     });
   }
+}
 
+function checkUpcomingPickups()
+{
+  console.log("...sending pickupDates request");
+  utils.makeDocRequest("https://foodsharing.de/?page=dashboard", function(responseXML)
+  {
+    console.log("retrieved pickupDates. Checking against notification time");
+    var pickups = responseXML.body.querySelector("#right").getElementsByClassName("ui-corner-all");
+    console.log("pickups: " + pickups);
+  });
+}
 
 // ACTIONS ____________________________________________________________________________
 
-  // if(b_autoLogin)
+  // if(settings.autoLogin)
   //   getPasswordsForFsAndLogin();
 
-
 // EXTRAS and DEBUGGING____________________________________________________________________________
-  // loginWorker.port.emit("login", email, pass);
-  tabs.open("https://foodsharing.de");
 
 }
 catch (e)
