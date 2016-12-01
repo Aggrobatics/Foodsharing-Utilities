@@ -1,6 +1,3 @@
 HTML CHECKBOX Kommunikation einrichten
-auto login funktion
-login funktion
-json settings datei
 css design
 nachrichten im panel anzeigen

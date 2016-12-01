@@ -18,7 +18,7 @@ self.port.on("login", function(email, password)
 	// if not logged in, log in
 	if(document.getElementById("loginbar"))
 	{
-		console.log("Received login command. Trying to log in now");	
+		// console.log("Received login command. Trying to log in now");	
 		var form = document.getElementById("loginbar");
 
 		// enter email
@@ -34,4 +34,4 @@ self.port.on("login", function(email, password)
 	}
 });
 
-console.log("end of login script");
+// console.log("end of login script");

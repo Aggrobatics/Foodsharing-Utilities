@@ -21,10 +21,24 @@
 		"description": "When active, the Addon will try to automatically login to https://foodsharing.de on Browser startup"
     },
 	{
-		"name": "notification",
-		"title": "Notification Time:",
-		"description": "To receive notifications for upcoming pickup dates, set how many minutes in advance you would like to be notified (0 disables any notifications; only works on a running Browser)",
+		"name": "msgIntervalTime",
+		"title": "Interval for check on new messages:",
+		"description": "Check for incoming messages every ... minutes (0 deactivates)",
 		"type": "integer",
-		"value": 0
+		"value": 5
+	},
+	{
+		"name": "pickupIntervalTime",
+		"title": "Interval for check on pickup-dates:",
+		"description": "Check for, and notify me about 'soon' upcoming pick-up dates every ... minutes (0 deactivates checks and any notifications)",
+		"type": "integer",
+		"value": 10
+	},
+	{
+		"name": "notificationTime",
+		"title": "Notification Threshold:",
+		"description": "I hereby define what 'soon' means in 'minutes before the deadline'(0 deactivates checks and any notifications)",
+		"type": "integer",
+		"value": 60
 	}]
 }
