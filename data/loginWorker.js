@@ -1,4 +1,4 @@
-console.log("start of login script");
+console.log("Start of login script. Received new doc");
 
 // if logged in, inform main. 
 if(document.querySelector("#infobar"))//.getElementsByClassName("msg").getElementsByClassName("badge"))
@@ -18,7 +18,7 @@ self.port.on("login", function(email, password)
 	// if not logged in, log in
 	if(document.getElementById("loginbar"))
 	{
-		console.log("Received login command. Trying to log in now");	
+		// console.log("Received login command. Trying to log in now");	
 		var form = document.getElementById("loginbar");
 
 		// enter email
@@ -26,6 +26,8 @@ self.port.on("login", function(email, password)
 		
 		// enter password
 		document.querySelector("#loginbar input[name=password]").value = password;
+
+		// submit will reload the page and restart the script
 		form.submit();
 	}
 	else
@@ -34,4 +36,4 @@ self.port.on("login", function(email, password)
 	}
 });
 
-console.log("end of login script");
+// console.log("end of login script");

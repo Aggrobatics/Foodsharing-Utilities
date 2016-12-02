@@ -1,12 +1,17 @@
 try
 {
 
+
 var data = require("sdk/self").data;
 var utils = require("./data/utils");
 var settings = require("sdk/simple-prefs").prefs;
+// pickupIntervalTime
+// msgIntervalTime
+// notificationTime
+// autoLogin
+
 
 // Objects
-var pickupHTMLElement;
 var tabs = require("sdk/tabs");
 var panel;
 var notifications = require("sdk/notifications");
@@ -15,36 +20,80 @@ var notifications = require("sdk/notifications");
 // Arrays
 var foodsharingTabs = [];
 var unreadMsgArray = [];
+var pickupArray = [];
 
 // Numbers
 var msgIntervalID;
 var blinkIntervalID;
+var pickupIntervalID;
 var failedLogins = 0;
-
-// Bools
-var b_originalTabText;
-var b_addonStart = true;
-var b_loggedIn = false;
-var b_passwordPresent = true;
-
-// Test Switches
-var b_useFakeLogin = true;
+var numberOfUpcomingDates = 0;
 
 // Login data
-
 var email;
 var pass;
-                                                                              // REMOVE THIS LATER ON!
-if(b_useFakeLogin)
-{
-  b_passwordPresent = true;
-  var email = "max.dusemund@trash-mail.com";
-  var pass = "wegwerfpasswort";
-}
 
 // Functions
 var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
 
+// Strings
+var buttonActive = "#00AAAA";
+var buttonInactive = "#FFFFFF";
+var buttonAlert = "#AA0000";
+var pickupURL;
+var messageURL;
+
+// Bools
+var b_originalTabText = true;
+var b_requestInstantOnLogin = true;
+var b_addonStart = true;
+var b_loggedIn = false;
+var b_passwordPresent = true;
+
+// Test Settings
+var b_useFakeData = true;
+var b_useFakeLogin = true;
+var b_useFakePickupDates = true;
+var b_useFakeMessages = false;
+                                                                        // REMOVE THIS LATER ON!
+if(b_useFakeData)
+{
+  settings.msgIntervalTime = 1;
+  settings.pickupIntervalTime = 1;
+  
+  if(b_useFakeLogin)
+  {
+    b_passwordPresent = true;
+    var email = "max.dusemund@trash-mail.com";
+    var pass = "wegwerfpasswort";
+  }
+  else
+  {
+    b_passwordPresent = true;
+    var email = "markus.schmieder@gmx.de";
+    var pass = "Joe5023234";
+  }
+}
+
+if(b_useFakePickupDates)
+{
+  pickupURL = data.url("fakePickupsHTML.html");
+}
+else
+{
+  pickupURL = "https://foodsharing.de/?page=dashboard";
+}
+
+if(b_useFakeMessages)
+{
+  messageURL = data.url("fakeMsgHTML.html");
+}
+else
+{
+  messageURL = "https://foodsharing.de/?page=msg";
+}
+
+console.log("messageURL: " + messageURL);
 
 // TABS         ____________________________________________________________________________
 
@@ -136,16 +185,18 @@ console.log("creating loginWorker");
 loginWorker = require("sdk/page-worker").Page(
 {
   contentScriptFile:  data.url("loginWorker.js"),
-  contentURL: "https://www.foodsharing.de/",
-  contentScriptWhen: "end"
+  contentURL: "https://foodsharing.de/",
+  contentScriptWhen: "ready"
 });
 
 
 loginWorker.port.on("loginPerformed", function(value)
 {
-  b_loggedIn = value;
-  if(value)
-    handleNewLogin();
+  if((value) && (!b_loggedIn))
+  {
+      b_loggedIn = value;
+      handleNewLogin();
+  }
 });
 
 // TOGGLE BUTTON ____________________________________________________________________________
@@ -161,7 +212,7 @@ var button = require("sdk/ui/button/toggle").ToggleButton({
     "64": "./gabel-64.png"
   },
 	badge: 0,
-	badgeColor: "#00AAAA",
+	badgeColor: buttonInactive,
   onClick: handleButtonChange
 });
 
@@ -184,52 +235,96 @@ panel.port.on("login", function(){
   getPasswordsForFsAndLogin();
 });
 
+panel.port.on("openFsTab", function()
+{
+  tabs.open("https://foodsharing.de");
+});
+
+// does not work, as checkbox does not fire any events!
 panel.port.on("autoLoginChanged", function(autoLogin){
   console.log("auto login changed to: " + autoLogin);
   settings.autoLogin = autoLogin;
 });
 
+
+
 // FUNCTION IMPLEMENTATIONS ____________________________________________________________________________
 
 function handleNewLogin()
 {
+  console.log("handleNewLogin()")
+
   if(!b_loggedIn)
   {
     console.log("something went pretty wrong here mate");
     return;
   }
 
-  checkUpcomingPickups();
-
-  console.log("handleNewLogin()")
-
-  // the firefox addon API does not support close() on notifications
-  notifications.notify({
-    title: "foodsharing.de",
-    text: "You are now logged in!",
-    iconURL: data.url("gabel-64.png")
-  });
-
-  console.log("enabling button again");
-  button.disabled = false;
-  button.badgeColor = "#000000";
+  // UI
+  button.badgeColor = buttonActive;
+  // panel.port.emit("showLoggedIn", pickupArray, unreadMsgArray);
+  panel.port.emit("showLoggedIn");
 
   // START INTERVAL TIMERS
-  startMsgUpdateInterval();
+
+  // messages
+  if(settings.msgIntervalTime > 0)
+  {
+    console.log("start msg interval at " + settings.msgIntervalTime + " minutes");
+    msgIntervalID = setInterval(function() 
+    {
+      requestMsgDocAndHandle();
+    }, settings.msgIntervalTime * 60 * 1000);
+    if(b_requestInstantOnLogin)
+      requestMsgDocAndHandle();
+  }
+
+  // pickups
+  if((settings.notificationTime > 0) && (settings.pickupIntervalTime > 0))
+  {
+    console.log("start pickup interval at " + settings.pickupIntervalTime + " minutes");
+    pickupIntervalID = setInterval(function() 
+    {
+      requestPickupDocAndHandle();
+    }, settings.pickupIntervalTime * 60 * 1000);
+    if(b_requestInstantOnLogin)
+      requestPickupDocAndHandle();
+  }
+
+// CAUSEES CRASH!!!!
+  // notifications.notify({
+  //   title: "foodsharing.de",
+  //   text: "You are now logged in!",
+  //   iconURL: data.url("gabel-64.png")
+  // });
+
+  console.log("end of handleNewLogin()");
 }
 
 function handleNewLogoff()
 {
   console.log("handleNewLogoff");
 
+  if(b_loggedIn == true)
+  {
+    console.log("SOMETHING WENT TERRIBLY WRONG MATE");
+  }
   b_loggedIn = false;
   
+  // update loginWorker, so it sees current page and can login 
+  loginWorker.contentURL = "https://foodsharing.de/";
+
+  // UI
+  button.badgeColor = buttonInactive;
+  button.badge.value = undefined;
+  panel.port.emit("showLoggedOff");
+  // STOP INTERVAL TIMERS
+
   clearInterval(msgIntervalID);
   msgIntervalID = 0;
 
-  button.badgeColor = "#FFFFFF";
-  button.badge.value = undefined;
-  // button.disabled = true;
+  clearInterval(pickupIntervalID);
+  pickupIntervalID = 0;
 
   stopBlinkInterval();
 }
@@ -237,22 +332,20 @@ function handleNewLogoff()
 // Show the panel when the user clicks the button.
 function handleButtonChange(state) 
 {    
-  console.log("handle button change has been called");
+  // console.log("handle button change has been called");
   if(state.checked)
   {
     if(Boolean(b_loggedIn))
     {
-      console.log("...sending pickupDates request");
-      utils.makeDocRequest("https://foodsharing.de/?page=dashboard", function(responseXML)
-      {
-        console.log("retrieved pickupDates. Updating variable");
-        pickupHTMLElement = responseXML.body.querySelector("#right").innerHTML;  
-        showPanel();
-      });
+      console.log("...sending all requests");
+      requestMsgDocAndHandle();
+      requestPickupDocAndHandle();
+
+      console.log("show panel now");
+      showPanel();
     }
     else
     {
-      pickupHTMLElement = "You are not logged in!";
       showPanel();
     }
   }
@@ -264,174 +357,283 @@ function handleButtonChange(state)
 
 function showPanel()
 {
-  panel.port.emit("fillPanel", pickupHTMLElement, unreadMsgArray, settings.autoLogin);
+  // if(b_loggedIn)
+  //   panel.port.emit("showLoggedIn", pickupHTMLElement, unreadMsgArray);
+  // else
+  //   panel.port.emit("showLoggedOff");
+  
   panel.show({position: button});
 }
 
 function updateBadge(value)
+{
+  if(value > button.badge)
   {
-    if(value > button.badge)
+    console.log("value is greater than badge-value. adjusting...")
+    // unread messages have increased!
+    button.badgeColor = buttonAlert;
+    button.badge = value;
+    // handle blinking
+    if((foodsharingTabs.length > 0) && (!blinkIntervalID) && (value >0))
     {
-      console.log("value is greater than badge-value. adjusting...")
-      // unread messages have increased!
-      button.badgeColor = "#AA0000";
-      button.badge = value;
-      // handle blinking
-      if((foodsharingTabs.length > 0) && (!blinkIntervalID) && (value >0))
-      {
-        // there are open tabs that can blink and...
-        // blinkInterval is not yet running
-        stopBlinkInterval();
-        console.log("starting blink interval");
-        blinkIntervalID = setInterval(function() 
-        {
-          b_originalTabText = !b_originalTabText;
-          switchTabsTitles(b_originalTabText, value);
-        }, 3000)
-      }
-    }
-    else if(value < button.badge)
-    {
-      console.log("value is smaller than button.bdage! adjusting...")
-      button.badge = value;
-      // unread messages have decreased (by user action) and...
-      // blink interval is running
-      button.badgeColor = "#00AAAA";
+      // there are open tabs that can blink and...
+      // blinkInterval is not yet running
       stopBlinkInterval();
+      console.log("starting blink interval");
+      blinkIntervalID = setInterval(function() 
+      {
+        b_originalTabText = !b_originalTabText;
+        switchTabsTitles(b_originalTabText, value);
+      }, 1000);
+    }
+  }
+  else if(value < button.badge)
+  {
+    console.log("value is smaller than button.bdage! adjusting...")
+    button.badge = value;
+    // unread messages have decreased (by user action) and...
+    // blink interval is running
+    button.badgeColor = buttonActive;
+    stopBlinkInterval();
+  }
+}
+
+function startMsgUpdateInterval()
+{
+    console.log("starting msg Interval now");
+    msgIntervalID = setInterval(function() 
+    {
+      // MESSAGES
+      console.log("...sending msgPage request");
+      cconsole.log("messageURL: " + messageURL);
+      requestMsgDocAndHandle();
+    }, settings.msgIntervalTime * 60 * 1000);
+};
+
+function requestMsgDocAndHandle()
+{
+  console.log("requestMsgDocAndHandle()");
+    utils.makeDocRequest(messageURL, 
+    function(doc) // Success function
+    {
+      handleMsgDocReload(doc);
+      return;
+    }, 
+    function() // Error function
+    {
+      console.log("failed to open fakeMsgHTML.html file");
+    });
+    return;
+}
+
+function handleMsgDocReload(doc)
+{
+  console.log("handleMsgDocReload()");
+
+  var convList = doc.querySelectorAll(".unread-1");
+  if(Boolean(convList))
+  {
+    unreadMsgArray = [];
+    msgListLength = convList.length;
+    console.log("there are " + msgListLength + " unread messages");
+    for(var i = 0; i < msgListLength; i++)
+    {
+      var name = convList[i].querySelector(".names").innerHTML;
+      var msg = convList[i].querySelector(".msg").innerHTML;
+      var time = convList[i].querySelector(".time").innerHTML;
+
+      var msgObject = utils.createMessageObject(name, msg, time);
+      unreadMsgArray.push(msgObject);
+      console.log(msgObject);
+    }
+    panel.port.emit("updateMsg", unreadMsgArray);
+    // console.log("before badge");
+    updateBadge(msgListLength);
+    // console.log("after badge");
+    return;
+  }
+  else if(!utils.checkLoginWithDom(doc))
+  {
+    console.log("loginbar found. Not logged in anymore");	
+    if(b_loggedIn)
+    {
+      b_loggedIn = false;
+      handleNewLogoff();
+    }
+  }
+  else
+  {
+    console.log("Something went terribly wrong. Found neither loginbar, nor badge!");
+  }
+}  
+
+  function requestPickupDocAndHandle()
+  {
+    utils.makeDocRequest(pickupURL, 
+    function(doc) // Success function
+    {
+        handlePickupDocReload(doc);
+    }, 
+    function() // Error function
+    {
+      console.log("failed to open htmlTempStorage.html file");
+    });
+    return;
+  }
+
+  function handlePickupDocReload(doc)
+  {
+    console.log("handlePickupDocReload()");
+
+
+    pickupArray = [];
+
+    var dates = doc.querySelector(".datelist").querySelectorAll(".ui-corner-all");
+    console.log("there are " + dates.length + " pickups registered. Notify me " + settings.notificationTime + " minutes in advance!");
+
+    if(dates.length > 0)
+    {
+        var pickupsText = "";
+        numberOfUpcomingDates = 0;
+        for(var i = 0; i < dates.length; i++)
+        {
+          var index = i+1; 
+          var containerElement = doc.querySelector(".datelist > li:nth-child(" + index + ") > a:nth-child(1)");
+          var timeElement = containerElement.querySelector("span:nth-child(1)");
+          var placeElement = containerElement.querySelector("span:nth-child(2)");
+       
+          console.log("Place: " + placeElement.innerHTML);
+          console.log("Time: " + timeElement.innerHTML);
+          // console.log(containerElement.href); // not right value. missing prefix https://foodsharing.de/!
+
+          // CHECK FOR TODAY's PICKUPS
+          if(Boolean(timeElement.innerHTML.search("Heute")+1))
+          {
+            console.log("pickup at " + placeElement.innerHTML + " is today");
+            var timeDate = utils.parseTime(timeElement.innerHTML);
+            // console.log("at " + timeDate + " o'clock"); 
+            console.log("at " + utils.extractTimeString(timeElement.innerHTML) + " o'clock");
+   
+            var pickupObject = utils.createPickupObject(placeElement.innerHTML, timeElement.innerHTML);
+            pickupArray.push(pickupObject);
+            console.log(pickupObject);
+
+            var remainingTime = pickupObject.minutes_remaining();
+            // console.log(remainingTime + " minutes remaining");
+
+            if((pickupObject.minutes_remaining < settings.notificationTime) && (pickupObject.minutes_remaining > 0))
+            {
+              console.log("That is soon! NOTIFY!!!");
+              numberOfUpcomingDates = numberOfUpcomingDates + 1;
+              pickupsText = pickupsText.concat("'" + placeElement.innerHTML + "' in " + remainingTime + " minutes;  "); 
+            }
+          }
+        }
+
+        if(numberOfUpcomingDates > 0)
+        {
+          var str = "You have " + numberOfUpcomingDates + " pickup(s) coming up soon: ";
+          str = str + pickupsText;
+          notifications.notify({
+              title: "foodsharing.de",
+              text: str,
+              iconURL: data.url("gabel-64.png")
+            });
+          console.log(str);
+        }
+
+        panel.port.emit("updatePickups", pickupArray);
+
+    }
+    // console.log("numberOfUpcomingDates ended up at " + numberOfUpcomingDates);
+    return numberOfUpcomingDates;
+  }
+
+
+  function stopBlinkInterval()
+  {
+    if(Boolean(blinkIntervalID))
+    {
+      // interval is running, so stop it now
+      console.log("stopping blinkInterval now");
+      clearInterval(blinkIntervalID);
+      blinkIntervalID = 0;
+      b_originalTabText = true;
+      switchTabsTitles(b_originalTabText, button.badge);
     }
   }
 
-  function startMsgUpdateInterval()
+  function switchTabsTitles(value, messages)
   {
-      console.log("starting interval timer now");
-      msgIntervalID = setInterval(function() 
-      {
-        // MESSAGES
-        console.log("...sending msgPage request");
-          utils.makeDocRequest("https://foodsharing.de/?page=msg", function(responseXML)
-          {
-              handleMsgDocReload(responseXML);
-          },
-          function(){console.log("shit. request didnt work");});
-      }, 5000);
-  };
+    var blinkText;
+    
+    if(!value)
+      blinkText = "(" + messages + ") New Messages!";
+    else if(messages > 0)
+      blinkText = "(" + messages + ") Foodsharing | Restlos Gluecklich";
+    else
+      blinkText = "Foodsharing | Restlos Gluecklich";
 
-  function handleMsgDocReload(document)
+    // console.log("changing tabs' titles to '" + blinkText + "'");
+
+    for (i = 0; i < foodsharingTabs.length; i++) {
+      foodsharingTabs[i].title = blinkText;
+    } 
+  }
+
+  // If you pass it a single property, only credentials matching that property are returned:
+  function getPasswordsForFsAndLogin() 
   {
-    if(document.getElementById("conversation-list"))
+    // console.log("getPasswordsForFsAndLogin()");
+    if(b_passwordPresent)                                                                   // Only for debugging purposes more or lesss
     {
-      // console.log("Found conversation-list!");
-      unreadMsgArray = document.getElementsByClassName("unread-1");
-      console.log("You have " + unreadMsgArray.length + " unread Messages");
-      updateBadge(unreadMsgArray.length);
-    }
-    else if(!utils.checkLoginWithDom(document))
-    {
-      console.log("loginbar found. Not logged in anymore");	
-      if(b_loggedIn)
-      {
-        handleNewLogoff();
-      }
-      
-      // requestLogin();
+      console.log("b_passwordPresent = true. Sending login now");
+      loginWorker.port.emit("login", email, pass);
+      return;
     }
     else
     {
-      console.log("Something went terribly wrong. Found neither loginbar, nor badge!");
-    }
-  }  
+      require("sdk/passwords").search({
+      url: "https://foodsharing.de",
+      onComplete: function onComplete(credentials) {
+        if(credentials.length > 0)
+        {
+          console.log("there are saved passwords!");
+          b_passwordPresent = true;
+          email = credentials[0].username;
+          pass = credentials[0].password;
 
-function stopBlinkInterval()
-{
-  if(Boolean(blinkIntervalID))
-  {
-    // interval is running, so stop it now
-    console.log("stopping blinkInterval now");
-    clearInterval(blinkIntervalID);
-    blinkIntervalID = 0;
-    b_originalTabText = true;
-    switchTabsTitles(b_originalTabText, button.badge);
-  }
-}
-
-function switchTabsTitles(value, messages)
-{
-  var blinkText;
-  
-  if(!value)
-    blinkText = "(" + messages + ") New Messages!";
-  else if(messages > 0)
-    blinkText = "(" + messages + ") Foodsharing | Restlos Gluecklich";
-  else
-    blinkText = "Foodsharing | Restlos Gluecklich";
-
-  // console.log("changing tabs' titles to '" + blinkText + "'");
-
-  for (i = 0; i < foodsharingTabs.length; i++) {
-    foodsharingTabs[i].title = blinkText;
-  } 
-}
-
-// If you pass it a single property, only credentials matching that property are returned:
-function getPasswordsForFsAndLogin() {
-  console.log("getPasswordsForFsAndLogin()");
-  if(b_passwordPresent)
-  {
-    console.log("b_passwordPresent = true. Sending fake login now");
-    loginWorker.port.emit("login", email, pass);
-    return;
-  }
-  else
-  {
-    require("sdk/passwords").search({
-    url: "https://foodsharing.de",
-    onComplete: function onComplete(credentials) {
-      if(credentials.length > 0)
-      {
-        console.log("there are saved passwords!");
-        b_passwordPresent = true;
-        email = credentials[0].username;
-        pass = credentials[0].password;
-
-        loginWorker.port.emit("login", email, pass);
-        return;
+          loginWorker.port.emit("login", email, pass);
+          return;
+        }
+        else
+        {
+          console.log("there are NO saved passwords!");
+          notifications.notify({
+            title: "foodsharing.de",
+            text: "Could not find login data! Please make sure you have stored your login data with Firefox (Master Password is recommended!), or deactivate auto-login under settings",
+            iconURL: data.url("gabel-64.png")
+          });
+          return;
+        }
       }
-      else
-      {
-        console.log("there are NO saved passwords!");
-        notifications.notify({
-          title: "foodsharing.de",
-          text: "Cannot find login data! Please make sure you have stored your login data with Firefox to use the App's login function (Master Password is recommended!)",
-          iconURL: data.url("gabel-64.png")
-        });
-        return;
-      }
+      });
     }
-    });
   }
-}
-
-function checkUpcomingPickups()
-{
-  console.log("...sending pickupDates request");
-  utils.makeDocRequest("https://foodsharing.de/?page=dashboard", function(responseXML)
-  {
-    console.log("retrieved pickupDates. Checking against notification time");
-    var pickups = responseXML.body.querySelector("#right").getElementsByClassName("ui-corner-all");
-    console.log("pickups: " + pickups);
-  });
-}
 
 // ACTIONS ____________________________________________________________________________
 
-  // if(settings.autoLogin)
-  //   getPasswordsForFsAndLogin();
+  if(settings.autoLogin)
+  {
+    console.log("autoLogin = true");
+    getPasswordsForFsAndLogin();
+  }
 
 // EXTRAS and DEBUGGING____________________________________________________________________________
+
 
 }
 catch (e)
 {
   console.log("error code: ", e);
 }
-
