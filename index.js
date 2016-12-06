@@ -1,6 +1,12 @@
+/* PLAN:
+
+loginWorker sendet per Ajax-POST (macht ihn das nicht nutzlos?)
+utils.checkLoginWithDOM() checkt alles
+
+*/
+
 try
 {
-
 
 var data = require("sdk/self").data;
 var utils = require("./data/utils");
@@ -9,6 +15,7 @@ var settings = require("sdk/simple-prefs").prefs;
 // msgIntervalTime
 // notificationTime
 // autoLogin
+
 
 
 // Objects
@@ -26,6 +33,7 @@ var pickupArray = [];
 var msgIntervalID;
 var blinkIntervalID;
 var pickupIntervalID;
+var checkLoginIntervalID;
 var failedLogins = 0;
 var numberOfUpcomingDates = 0;
 
@@ -36,25 +44,28 @@ var pass;
 // Functions
 var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
 
+setInterval
+
 // Strings
 var buttonActive = "#00AAAA";
 var buttonInactive = "#FFFFFF";
 var buttonAlert = "#AA0000";
 var pickupURL;
 var messageURL;
+var loginURL = "/?page=login&amp;ref=%2F%3Fpage%3Ddashboard";
 
 // Bools
 var b_originalTabText = true;
 var b_requestInstantOnLogin = true;
-var b_addonStart = true;
 var b_loggedIn = false;
 var b_passwordPresent = true;
 
 // Test Settings
 var b_useFakeData = true;
+var b_useLoginRequest = false;
 var b_useFakeLogin = true;
 var b_useFakePickupDates = true;
-var b_useFakeMessages = false;
+var b_useFakeMessages = true;
                                                                         // REMOVE THIS LATER ON!
 if(b_useFakeData)
 {
@@ -92,8 +103,6 @@ else
 {
   messageURL = "https://foodsharing.de/?page=msg";
 }
-
-console.log("messageURL: " + messageURL);
 
 // TABS         ____________________________________________________________________________
 
@@ -180,7 +189,7 @@ tabs.on('ready', function(tab)
 
 // LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
 
-console.log("creating loginWorker");
+// console.log("creating loginWorker");
 
 loginWorker = require("sdk/page-worker").Page(
 {
@@ -189,14 +198,42 @@ loginWorker = require("sdk/page-worker").Page(
   contentScriptWhen: "ready"
 });
 
-
 loginWorker.port.on("loginPerformed", function(value)
 {
-  if((value) && (!b_loggedIn))
+  var str = "received message from loginWorker";
+  if(b_loggedIn == Boolean(value))
   {
-      b_loggedIn = value;
-      handleNewLogin();
+    str += ". But login-status is up-to-date";
+    return;
   }
+  else
+    str += ". Login-status has changed. Handling...";
+  console.log("received message from loginWorker");
+
+
+  switch(value) 
+  {
+    case 1:
+      if((value == 1) && (!b_loggedIn))
+      {
+        console.log("login succesfull");
+        b_loggedIn = value;
+        handleNewLogin();
+      }
+      break;
+    case 0:
+      console.log("loginWorker says login was not succesfull!");
+      b_loggedIn = false;
+      handleNewLogoff();
+      break;
+    case -1:
+      console.log("loginWorker requests loginCheck");
+      checkLoginRepeatedly();
+      break;
+    default:
+      console.log("loginWorker is trolling");
+  } 
+
 });
 
 // TOGGLE BUTTON ____________________________________________________________________________
@@ -229,6 +266,7 @@ onHide : function()
       button.state('window', {checked: false});
   }
 });
+panel.resize(600, 500);
 
 panel.port.on("login", function(){
   console.log("received button click");
@@ -259,11 +297,15 @@ function handleNewLogin()
     console.log("something went pretty wrong here mate");
     return;
   }
-
+  panel.port.emit("showLoggedIn");
   // UI
   button.badgeColor = buttonActive;
-  // panel.port.emit("showLoggedIn", pickupArray, unreadMsgArray);
-  panel.port.emit("showLoggedIn");
+  
+  
+  // foodsharingTabs.forEach(function(tab)
+  // {
+  //   tab.reload();
+  // });
 
   // START INTERVAL TIMERS
 
@@ -291,12 +333,12 @@ function handleNewLogin()
       requestPickupDocAndHandle();
   }
 
-// CAUSEES CRASH!!!!
-  // notifications.notify({
-  //   title: "foodsharing.de",
-  //   text: "You are now logged in!",
-  //   iconURL: data.url("gabel-64.png")
-  // });
+  // CAUSEES CRASH!!!!
+  notifications.notify({
+    title: "foodsharing.de",
+    text: "You are now logged in!",
+    iconURL: data.url("gabel-64.png")
+  });
 
   console.log("end of handleNewLogin()");
 }
@@ -311,8 +353,13 @@ function handleNewLogoff()
   }
   b_loggedIn = false;
   
-  // update loginWorker, so it sees current page and can login 
-  loginWorker.contentURL = "https://foodsharing.de/";
+  // refresh loginWorker, so it sees current page and can login
+  // refreshing contentURL did NOT work!!!
+  // reconstructing loginWorker did not work!!!
+  // lost all port-connection to loginWorker either way
+  console.log("informing loginWorker to refresh");
+  loginWorker.port.emit("refresh");
+
 
   // UI
   button.badgeColor = buttonInactive;
@@ -444,8 +491,9 @@ function handleMsgDocReload(doc)
 
       var msgObject = utils.createMessageObject(name, msg, time);
       unreadMsgArray.push(msgObject);
-      console.log(msgObject);
+      // console.log(msgObject);
     }
+    console.log("updating panel messages. Any response?");
     panel.port.emit("updateMsg", unreadMsgArray);
     // console.log("before badge");
     updateBadge(msgListLength);
@@ -484,27 +532,25 @@ function handleMsgDocReload(doc)
   function handlePickupDocReload(doc)
   {
     console.log("handlePickupDocReload()");
-
-
     pickupArray = [];
 
     var dates = doc.querySelector(".datelist").querySelectorAll(".ui-corner-all");
     console.log("there are " + dates.length + " pickups registered. Notify me " + settings.notificationTime + " minutes in advance!");
 
+    console.log("check 1");
     if(dates.length > 0)
     {
+      console.log("check 2");
         var pickupsText = "";
         numberOfUpcomingDates = 0;
-        for(var i = 0; i < dates.length; i++)
-        {
-          var index = i+1; 
-          var containerElement = doc.querySelector(".datelist > li:nth-child(" + index + ") > a:nth-child(1)");
-          var timeElement = containerElement.querySelector("span:nth-child(1)");
-          var placeElement = containerElement.querySelector("span:nth-child(2)");
-       
+        // for(var i = 0; i < dates.length; i++)
+        // {
+          dates.forEach(function(item)
+          {
+          var timeElement = item.querySelector("span:nth-child(1)");
+          var placeElement = item.querySelector("span:nth-child(2)");
           console.log("Place: " + placeElement.innerHTML);
           console.log("Time: " + timeElement.innerHTML);
-          // console.log(containerElement.href); // not right value. missing prefix https://foodsharing.de/!
 
           // CHECK FOR TODAY's PICKUPS
           if(Boolean(timeElement.innerHTML.search("Heute")+1))
@@ -528,7 +574,7 @@ function handleMsgDocReload(doc)
               pickupsText = pickupsText.concat("'" + placeElement.innerHTML + "' in " + remainingTime + " minutes;  "); 
             }
           }
-        }
+        });
 
         if(numberOfUpcomingDates > 0)
         {
@@ -541,7 +587,7 @@ function handleMsgDocReload(doc)
             });
           console.log(str);
         }
-
+        console.log("updating panel pickups. Any response?");
         panel.port.emit("updatePickups", pickupArray);
 
     }
@@ -588,7 +634,7 @@ function handleMsgDocReload(doc)
     if(b_passwordPresent)                                                                   // Only for debugging purposes more or lesss
     {
       console.log("b_passwordPresent = true. Sending login now");
-      loginWorker.port.emit("login", email, pass);
+      sendLoginRequest();
       return;
     }
     else
@@ -603,7 +649,7 @@ function handleMsgDocReload(doc)
           email = credentials[0].username;
           pass = credentials[0].password;
 
-          loginWorker.port.emit("login", email, pass);
+          sendLoginRequest();
           return;
         }
         else
@@ -621,6 +667,102 @@ function handleMsgDocReload(doc)
     }
   }
 
+  function sendLoginRequest()
+  {
+    if(b_passwordPresent)
+    {
+      if(b_useLoginRequest)
+      {
+        console.log("sending login POST");
+        utils.makeDocRequest(data.url("submitForm.html"), 
+        function(submitForm) // OnSuccess
+        {
+          console.log("Got submitForm.html! Passing to makeLoginPost() now");
+          // submit loginData using submitForm.html
+          utils.makeLoginPost(submitForm, email, pass);
+
+          console.log("starting loginCheck Interval");
+          // And start checking (repeatedly) for login....
+          checkLoginIntervalID = setInterval(function() 
+          {
+            console.log("loginCheck tick");
+            utils.makeDocRequest("loginURL", function(doc)
+            {
+                console.log("requesting page for loginCheck");
+                if(utils.checkLoginWithDom(doc))
+                {
+                  console.log("checkLoginWithDom() returned true");
+                  clearInterval(checkLoginIntervalID);
+                  b_loggedIn = true;
+                  handleNewLogin();
+                }
+                else
+                {
+                  console.log("Checked site. still not logged in!");
+                }
+            },
+            function()
+            {
+              console.log("Request to " + loginURL + " for loginCheck failed");
+            });
+          }, 2000);
+        },
+        function()  // onError
+        {
+          console.log("could not open submitForm.html");
+        });
+      }
+      else
+      {
+        loginWorker.port.emit("login", email, pass);
+      }
+    }
+    else
+    {
+      console.log("Cannot send login-request without email and password!");
+    }
+
+  }
+
+  function checkLoginRepeatedly()
+  {
+    var numberOfChecks = 0;
+    checkLoginIntervalID = setInterval(function() 
+    {
+      numberOfChecks += 1;
+      console.log("loginCheck tick. Attempt: " + numberOfChecks);
+      if(numberOfChecks <= 5)
+      {
+        utils.makeDocRequest("https://foodsharing.de", function(doc)
+        {
+            console.log("requesting page for loginCheck");
+ 						console.log("loginbar index: " + doc.getElementById("loginbar").outerHTML);
+            if(utils.checkLoginWithDom(doc))
+            {
+              console.log("checkLoginWithDom() returned true");
+              clearInterval(checkLoginIntervalID);
+              b_loggedIn = true;
+              handleNewLogin();
+            }
+            else
+            {
+              console.log("Checked site. still not logged in!");
+            }
+        },
+        function()
+        {
+          console.log("Request to " + loginURL + " for loginCheck failed");
+        });
+      }
+      else
+      {
+        console.log("giving up on checking");
+        clearInterval(checkLoginIntervalID);
+        b_loggedIn = false;
+      }
+    }, 2000);
+  }
+
 // ACTIONS ____________________________________________________________________________
 
   if(settings.autoLogin)
@@ -631,7 +773,8 @@ function handleMsgDocReload(doc)
 
 // EXTRAS and DEBUGGING____________________________________________________________________________
 
-
+  // b_loggedIn = true;
+  // handleNewLogin();
 }
 catch (e)
 {
