@@ -1,10 +1,3 @@
-/* PLAN:
-
-loginWorker sendet per Ajax-POST (macht ihn das nicht nutzlos?)
-utils.checkLoginWithDOM() checkt alles
-
-*/
-
 try
 {
 
@@ -52,6 +45,7 @@ var buttonInactive = "#FFFFFF";
 var buttonAlert = "#AA0000";
 var pickupURL;
 var messageURL;
+var msgSoundURL = data.url("Navi_Look.mp3");
 var loginURL = "/?page=login&amp;ref=%2F%3Fpage%3Ddashboard";
 
 // Bools
@@ -59,13 +53,14 @@ var b_originalTabText = true;
 var b_requestInstantOnLogin = true;
 var b_loggedIn = false;
 var b_passwordPresent = true;
+var b_playSounds = true;
 
 // Test Settings
 var b_useFakeData = true;
 var b_useLoginRequest = false;
 var b_useFakeLogin = true;
 var b_useFakePickupDates = true;
-var b_useFakeMessages = true;
+var b_useFakeMessages = false;
                                                                         // REMOVE THIS LATER ON!
 if(b_useFakeData)
 {
@@ -316,7 +311,7 @@ function handleNewLogin()
     msgIntervalID = setInterval(function() 
     {
       requestMsgDocAndHandle();
-    }, settings.msgIntervalTime * 60 * 1000);
+    }, 3000); //settings.msgIntervalTime * 60 * 1000);
     if(b_requestInstantOnLogin)
       requestMsgDocAndHandle();
   }
@@ -431,7 +426,24 @@ function updateBadge(value)
       {
         b_originalTabText = !b_originalTabText;
         switchTabsTitles(b_originalTabText, value);
-      }, 1000);
+      }, 2000);
+    }
+
+    if(b_playSounds)
+    {
+      console.log("Trying to play sound...");
+      // Does NOT work :'-(
+      // utils.playMsgSound(msgSoundURL);
+
+      // This does neither
+      // notifications.notify({
+      //         title: "foodsharing.de",
+      //         text: "You have new messages",
+      //         sound: msgSoundURL,
+      //         iconURL: data.url("gabel-64.png")
+      // });
+
+      playSound(msgSoundURL);
     }
   }
   else if(value < button.badge)
@@ -459,7 +471,6 @@ function startMsgUpdateInterval()
 
 function requestMsgDocAndHandle()
 {
-  console.log("requestMsgDocAndHandle()");
     utils.makeDocRequest(messageURL, 
     function(doc) // Success function
     {
@@ -493,7 +504,6 @@ function handleMsgDocReload(doc)
       unreadMsgArray.push(msgObject);
       // console.log(msgObject);
     }
-    console.log("updating panel messages. Any response?");
     panel.port.emit("updateMsg", unreadMsgArray);
     // console.log("before badge");
     updateBadge(msgListLength);
@@ -537,10 +547,8 @@ function handleMsgDocReload(doc)
     var dates = doc.querySelector(".datelist").querySelectorAll(".ui-corner-all");
     console.log("there are " + dates.length + " pickups registered. Notify me " + settings.notificationTime + " minutes in advance!");
 
-    console.log("check 1");
     if(dates.length > 0)
     {
-      console.log("check 2");
         var pickupsText = "";
         numberOfUpcomingDates = 0;
         // for(var i = 0; i < dates.length; i++)
@@ -587,11 +595,9 @@ function handleMsgDocReload(doc)
             });
           console.log(str);
         }
-        console.log("updating panel pickups. Any response?");
         panel.port.emit("updatePickups", pickupArray);
 
     }
-    // console.log("numberOfUpcomingDates ended up at " + numberOfUpcomingDates);
     return numberOfUpcomingDates;
   }
 
@@ -775,6 +781,59 @@ function handleMsgDocReload(doc)
 
   // b_loggedIn = true;
   // handleNewLogin();
+
+  var window;
+if (window === null || typeof window !== "object") 
+{
+    window = require('sdk/window/utils').getMostRecentBrowserWindow();
+}
+console.log("Got the window: " + window);
+var AudioContext = window.AudioContext || window.webkitAudioContext;
+console.log("AudioContext : " + AudioContext);
+const {XMLHttpRequest} = require("sdk/net/xhr");
+
+function playSound(filePath)
+{
+    console.log("playSound()");
+    // var context = new webkitAudioContext(); // new AudioContext() || new webkitAudioContext();
+    console.log("check 0");
+    request = new XMLHttpRequest();
+    console.log("check 1");
+    request.open("GET", filePath, true);
+        console.log("check 2");
+    request.responseType = "arrayBuffer";
+        console.log("check 3");
+    request.onload = function()
+    {
+            console.log("check 4");
+        var audioData = request.response;
+
+        // old way
+        // AudioContext.decodeAudioData(request.response, onDecode);
+
+        // "new" way, 'promise'-style
+        AudioContext.decodeAudioData(audioData).then(onDecoded);
+
+        // This part is never reached....
+        console.log("check 4.5");
+    }
+
+    function onDecoded(buffer)
+    {
+            console.log("check 5");
+        var bufferSource = AudioContext.createBufferSource();
+            console.log("check 6");
+        bufferSource.buffer = buffer;
+            console.log("check 7");
+        bufferSource.connect(AudioContext.destination);
+            console.log("check 8");
+        bufferSource.start();
+    }
+    console.log("check 9");
+    request.send();
+};
+
+playSound(msgSoundURL);
 }
 catch (e)
 {

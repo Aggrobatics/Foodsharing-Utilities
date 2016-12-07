@@ -167,3 +167,38 @@ function createMsgObject(title, msg, moment) {
     }
     return obj;
 }
+
+exports.playMsgSound = function(filePath)
+{
+    console.log("playSound()");
+    var context = new webkitAudioContext(); // new AudioContext() || new webkitAudioContext();
+    console.log("check 0");
+    request = new XMLHttpRequest();
+        console.log("check 1");
+
+    request = new XMLHttpRequest();
+    console.log("check 1");
+    request.open("GET", "Happy Bee.mp3", true);
+        console.log("check 2");
+    request.responseType = "arrayBuffer";
+        console.log("check 3");
+    request.onload = function()
+    {
+            console.log("check 4");
+        context.decodeAudioData(request.response, onDecode);
+    }
+
+    function onDecoded(buffer)
+    {
+            console.log("check 5");
+        var bufferSource = context.createBufferSource();
+            console.log("check 6");
+        bufferSource.buffer = buffer;
+            console.log("check 7");
+        bufferSource.connext(context.destination);
+            console.log("check 8");
+        bufferSource.start();
+    }
+    console.log("check 9");
+    request.send();
+};
