@@ -8,6 +8,40 @@ var settings = require("sdk/simple-prefs").prefs;
 // msgIntervalTime
 // notificationTime
 // autoLogin
+// playSounds
+// soundFileNr
+
+require("sdk/simple-prefs").on("soundFileNr", onSoundPrefChange)
+function onSoundPrefChange(prefName) 
+{
+  console.log("The preference " + 
+              prefName + 
+              " value has changed!");
+  switch (prefName)
+  {
+    case "soundFileNr":
+      console.log("And it was the sound file!");
+      msgSoundURL = data.url(utils.getSoundFileName(settings.soundFileNr));
+      playMsgSound();
+      break;
+    case "msgIntervalTime":
+      console.log("And it was msgIntervalTime. Restarting Interval");
+      clearInterval(msgIntervalID);
+      msgIntervalID = setInterval(function() 
+      {
+        requestMsgDocAndHandle();
+      }, settings.msgIntervalTime * 60 * 1000);
+      break;
+    case "pickupIntervalTime":
+      console.log("And it was pickupIntervalTime. Restarting Interval");
+      clearInterval(pickupIntervalID);
+      pickupIntervalID = setInterval(function() 
+      {
+        requestPickupDocAndHandle();
+      }, settings.pickupIntervalTime * 60 * 1000);
+      break;
+  }
+}
 
 
 
@@ -20,7 +54,7 @@ var notifications = require("sdk/notifications");
 // Arrays
 var foodsharingTabs = [];
 var unreadMsgArray = [];
-var pickupArray = [];
+var pickupsTodayArray = [];
 
 // Numbers
 var msgIntervalID;
@@ -37,15 +71,14 @@ var pass;
 // Functions
 var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
 
-setInterval
-
 // Strings
 var buttonActive = "#00AAAA";
 var buttonInactive = "#FFFFFF";
 var buttonAlert = "#AA0000";
 var pickupURL;
 var messageURL;
-var msgSoundURL = data.url("Navi_Look.mp3");
+var msgSoundURL = data.url(utils.getSoundFileName(settings.soundFileNr));
+console.log("msgSoundURL: " + msgSoundURL);
 var loginURL = "/?page=login&amp;ref=%2F%3Fpage%3Ddashboard";
 
 // Bools
@@ -53,7 +86,7 @@ var b_originalTabText = true;
 var b_requestInstantOnLogin = true;
 var b_loggedIn = false;
 var b_passwordPresent = true;
-var b_playSounds = true;
+var b_readyForNextNotify = true;
 
 // Test Settings
 var b_useFakeData = true;
@@ -311,7 +344,7 @@ function handleNewLogin()
     msgIntervalID = setInterval(function() 
     {
       requestMsgDocAndHandle();
-    }, 3000); //settings.msgIntervalTime * 60 * 1000);
+    }, settings.msgIntervalTime * 60 * 1000);
     if(b_requestInstantOnLogin)
       requestMsgDocAndHandle();
   }
@@ -327,13 +360,8 @@ function handleNewLogin()
     if(b_requestInstantOnLogin)
       requestPickupDocAndHandle();
   }
-
-  // CAUSEES CRASH!!!!
-  notifications.notify({
-    title: "foodsharing.de",
-    text: "You are now logged in!",
-    iconURL: data.url("gabel-64.png")
-  });
+  console.log("request login-notification");
+  showNotification("You are now logged in!");
 
   console.log("end of handleNewLogin()");
 }
@@ -429,22 +457,8 @@ function updateBadge(value)
       }, 2000);
     }
 
-    if(b_playSounds)
-    {
-      console.log("Trying to play sound...");
-      // Does NOT work :'-(
-      // utils.playMsgSound(msgSoundURL);
-
-      // This does neither
-      // notifications.notify({
-      //         title: "foodsharing.de",
-      //         text: "You have new messages",
-      //         sound: msgSoundURL,
-      //         iconURL: data.url("gabel-64.png")
-      // });
-
-      playSound(msgSoundURL);
-    }
+    if(settings.playSounds)
+      playMsgSound();
   }
   else if(value < button.badge)
   {
@@ -542,7 +556,7 @@ function handleMsgDocReload(doc)
   function handlePickupDocReload(doc)
   {
     console.log("handlePickupDocReload()");
-    pickupArray = [];
+    pickupsTodayArray = [];
 
     var dates = doc.querySelector(".datelist").querySelectorAll(".ui-corner-all");
     console.log("there are " + dates.length + " pickups registered. Notify me " + settings.notificationTime + " minutes in advance!");
@@ -569,13 +583,13 @@ function handleMsgDocReload(doc)
             console.log("at " + utils.extractTimeString(timeElement.innerHTML) + " o'clock");
    
             var pickupObject = utils.createPickupObject(placeElement.innerHTML, timeElement.innerHTML);
-            pickupArray.push(pickupObject);
-            console.log(pickupObject);
+            pickupsTodayArray.push(pickupObject);
+            // console.log(pickupObject);
 
             var remainingTime = pickupObject.minutes_remaining();
-            // console.log(remainingTime + " minutes remaining");
+            console.log(remainingTime + " minutes remaining");
 
-            if((pickupObject.minutes_remaining < settings.notificationTime) && (pickupObject.minutes_remaining > 0))
+            if((remainingTime < settings.notificationTime) && (remainingTime > 0))
             {
               console.log("That is soon! NOTIFY!!!");
               numberOfUpcomingDates = numberOfUpcomingDates + 1;
@@ -583,19 +597,16 @@ function handleMsgDocReload(doc)
             }
           }
         });
-
+        console.log("check pickupArray.length: " + numberOfUpcomingDates);
         if(numberOfUpcomingDates > 0)
         {
+          console.log("trying to notify about upcoming pickups");
           var str = "You have " + numberOfUpcomingDates + " pickup(s) coming up soon: ";
           str = str + pickupsText;
-          notifications.notify({
-              title: "foodsharing.de",
-              text: str,
-              iconURL: data.url("gabel-64.png")
-            });
-          console.log(str);
+          showNotification(str);
+          // console.log(str);
         }
-        panel.port.emit("updatePickups", pickupArray);
+        panel.port.emit("updatePickups", pickupsTodayArray);
 
     }
     return numberOfUpcomingDates;
@@ -661,11 +672,7 @@ function handleMsgDocReload(doc)
         else
         {
           console.log("there are NO saved passwords!");
-          notifications.notify({
-            title: "foodsharing.de",
-            text: "Could not find login data! Please make sure you have stored your login data with Firefox (Master Password is recommended!), or deactivate auto-login under settings",
-            iconURL: data.url("gabel-64.png")
-          });
+          showNotification("Could not find login data! Please make sure you have stored your login data with Firefox (Master Password is recommended!), or deactivate auto-login under settings");
           return;
         }
       }
@@ -769,6 +776,71 @@ function handleMsgDocReload(doc)
     }, 2000);
   }
 
+
+  function playMsgSound()
+  {
+    console.log("playSound("+ msgSoundURL + ")");
+
+    var window = utils.currentWindow();
+
+    console.log("Got the window: " + window);
+    // var AudioContext = window.AudioContext || window.webkitAudioContext;
+    // console.log("AudioContext : " + AudioContext);
+    const {XMLHttpRequest} = require("sdk/net/xhr");
+    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var source = audioCtx.createBufferSource();
+    var request = new XMLHttpRequest();
+
+    request.open('GET', msgSoundURL, true);
+
+    request.responseType = 'arraybuffer';
+
+
+    request.onload = function() {
+      var audioData = request.response;
+
+      audioCtx.decodeAudioData(audioData, function(buffer) {
+          source.buffer = buffer;
+
+          source.connect(audioCtx.destination);
+          source.loop = false;
+        },
+
+        function(e){"Error with decoding audio data" + e.err});
+
+    }
+
+    request.send();
+    source.start(0);      
+  }
+
+  function showNotification(text)
+  {
+    console.log("showNotification()");
+    if(text)
+    {
+      if(b_readyForNextNotify)
+      {
+        b_readyForNextNotify = false;
+        console.log("showing notification");
+        notifications.notify({
+          title: "foodsharing.de",
+          text: text,
+          iconURL: data.url("gabel-64.png")
+        });
+        setTimeout(function()
+        {
+          console.log("Timeout done. Notify-System is open again");
+          b_readyForNextNotify = true;
+        }, 3000); 
+      }
+      else
+        console.log("notification system blocked! Notify is rejected");
+    }
+    else
+      console.log("Sorry dawg! No text, no notification!");
+  }
+
 // ACTIONS ____________________________________________________________________________
 
   if(settings.autoLogin)
@@ -779,61 +851,57 @@ function handleMsgDocReload(doc)
 
 // EXTRAS and DEBUGGING____________________________________________________________________________
 
-  // b_loggedIn = true;
-  // handleNewLogin();
+  // var window;
+  // if (window === null || typeof window !== "object") 
+  // {
+  //     window = require('sdk/window/utils').getMostRecentBrowserWindow();
+  // }
+  // console.log("Got the window: " + window);
+  // var AudioContext = window.AudioContext || window.webkitAudioContext;
+  // console.log("AudioContext : " + AudioContext);
+  // const {XMLHttpRequest} = require("sdk/net/xhr");
+  // var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // var source;
 
-  var window;
-if (window === null || typeof window !== "object") 
-{
-    window = require('sdk/window/utils').getMostRecentBrowserWindow();
-}
-console.log("Got the window: " + window);
-var AudioContext = window.AudioContext || window.webkitAudioContext;
-console.log("AudioContext : " + AudioContext);
-const {XMLHttpRequest} = require("sdk/net/xhr");
+  // function getData(filePath) 
+  // {
+  //   source = audioCtx.createBufferSource();
+  //   var request = new XMLHttpRequest();
 
-function playSound(filePath)
-{
-    console.log("playSound()");
-    // var context = new webkitAudioContext(); // new AudioContext() || new webkitAudioContext();
-    console.log("check 0");
-    request = new XMLHttpRequest();
-    console.log("check 1");
-    request.open("GET", filePath, true);
-        console.log("check 2");
-    request.responseType = "arrayBuffer";
-        console.log("check 3");
-    request.onload = function()
-    {
-            console.log("check 4");
-        var audioData = request.response;
+  //   request.open('GET', filePath, true);
 
-        // old way
-        // AudioContext.decodeAudioData(request.response, onDecode);
+  //   request.responseType = 'arraybuffer';
 
-        // "new" way, 'promise'-style
-        AudioContext.decodeAudioData(audioData).then(onDecoded);
 
-        // This part is never reached....
-        console.log("check 4.5");
-    }
+  //   request.onload = function() {
+  //     var audioData = request.response;
 
-    function onDecoded(buffer)
-    {
-            console.log("check 5");
-        var bufferSource = AudioContext.createBufferSource();
-            console.log("check 6");
-        bufferSource.buffer = buffer;
-            console.log("check 7");
-        bufferSource.connect(AudioContext.destination);
-            console.log("check 8");
-        bufferSource.start();
-    }
-    console.log("check 9");
-    request.send();
-};
+  //     audioCtx.decodeAudioData(audioData, function(buffer) {
+  //         source.buffer = buffer;
 
-playSound(msgSoundURL);
+  //         source.connect(audioCtx.destination);
+  //         source.loop = false;
+  //       },
+
+  //       function(e){"Error with decoding audio data" + e.err});
+
+  //   }
+
+  //   request.send();
+  // }
+
+  // function playMsgSound()
+  // {
+  //   console.log("playSound("+ msgSoundURL + ")");
+  //     // var intervalID = window.setInterval(function()
+  //     // {
+  //       // getData(filePath);
+  //       getData(msgSoundURL);
+  //       source.start(0);  
+  //     // }, 5000);
+      
+  // }
+
 }
 catch (e)
 {

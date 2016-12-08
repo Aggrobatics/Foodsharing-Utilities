@@ -25,14 +25,14 @@
 		"title": "Interval for check on new messages:",
 		"description": "Check for incoming messages every ... minutes (0 deactivates)",
 		"type": "integer",
-		"value": 5
+		"value": 1
 	},
 	{
 		"name": "pickupIntervalTime",
 		"title": "Interval for check on pickup-dates:",
 		"description": "Check for, and notify me about 'soon' upcoming pick-up dates every ... minutes (0 deactivates checks and any notifications)",
 		"type": "integer",
-		"value": 10
+		"value": 1
 	},
 	{
 		"name": "notificationTime",
@@ -40,5 +40,45 @@
 		"description": "I hereby define what 'soon' means in 'minutes before the deadline' (0 deactivates checks and any notifications; only works on same day)",
 		"type": "integer",
 		"value": 60
+	},
+		{
+		"name": "playSounds",
+		"title": "Play message sounds:",
+		"description": "",
+		"type": "bool",
+		"value": true
+	}, 	
+	{
+		"name": "soundFileNr",
+		"type": "menulist",
+		"title": "Soundfile",
+		"value": 0,
+		"options": 
+		[
+			{
+				"value": 0,
+				"label": "Apple"
+			},
+			{
+				"value": 1,
+				"label": "Carrot"
+			},
+			{
+				"value": 2,
+				"label": "Celery"
+			},
+			{
+				"value": 3,
+				"label": "Chips"
+			},
+			{
+				"value": 4,
+				"label": "Cracker"
+			},
+			{
+				"value": 5,
+				"label": "Nut"
+			}
+		]
 	}]
 }
