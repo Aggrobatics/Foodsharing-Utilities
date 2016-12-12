@@ -142,13 +142,14 @@ function remainingT(timeDate) {
 
 exports.createPickupObject = createPickupObj;
 
-function createPickupObj(placeString, timeString) {
+function createPickupObj(placeString, timeString, pageLink) {
     // console.log("utils.create called");
 
     // cannot call parseT to fill property for some reason. crashes every time
     var obj = {
         place_string: placeString,
         time_string: timeString,
+        href: pageLink,
         date_formatted: parseT(timeString), // dateFormatted, //  
         minutes_remaining: function () {
             return remainingT(this.date_formatted);

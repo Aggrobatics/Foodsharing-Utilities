@@ -294,7 +294,7 @@ onHide : function()
       button.state('window', {checked: false});
   }
 });
-panel.resize(600, 500);
+panel.resize(770, 500);
 
 panel.port.on("login", function(){
   console.log("received button click");
@@ -310,6 +310,11 @@ panel.port.on("openFsTab", function()
 panel.port.on("autoLoginChanged", function(autoLogin){
   console.log("auto login changed to: " + autoLogin);
   settings.autoLogin = autoLogin;
+});
+
+panel.port.on("open", function(link)
+{
+  console.log("received request from panel to open " + link);
 });
 
 
@@ -565,14 +570,16 @@ function handleMsgDocReload(doc)
     {
         var pickupsText = "";
         numberOfUpcomingDates = 0;
-        // for(var i = 0; i < dates.length; i++)
-        // {
-          dates.forEach(function(item)
-          {
+
+        dates.forEach(function(item)
+        {
+          var pageLink = item.href.slice(item.href.indexOf("/?page="), item.href.length) || "";
+          pageLink = "https://foodsharing.de" + pageLink;
+          console.log("href: " + pageLink);
           var timeElement = item.querySelector("span:nth-child(1)");
           var placeElement = item.querySelector("span:nth-child(2)");
-          console.log("Place: " + placeElement.innerHTML);
-          console.log("Time: " + timeElement.innerHTML);
+          // console.log("Place: " + placeElement.innerHTML);
+          // console.log("Time: " + timeElement.innerHTML);
 
           // CHECK FOR TODAY's PICKUPS
           if(Boolean(timeElement.innerHTML.search("Heute")+1))
@@ -580,9 +587,9 @@ function handleMsgDocReload(doc)
             console.log("pickup at " + placeElement.innerHTML + " is today");
             var timeDate = utils.parseTime(timeElement.innerHTML);
             // console.log("at " + timeDate + " o'clock"); 
-            console.log("at " + utils.extractTimeString(timeElement.innerHTML) + " o'clock");
+            // console.log("at " + utils.extractTimeString(timeElement.innerHTML) + " o'clock");
    
-            var pickupObject = utils.createPickupObject(placeElement.innerHTML, timeElement.innerHTML);
+            var pickupObject = utils.createPickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
             pickupsTodayArray.push(pickupObject);
             // console.log(pickupObject);
 
@@ -783,7 +790,7 @@ function handleMsgDocReload(doc)
 
     var window = utils.currentWindow();
 
-    console.log("Got the window: " + window);
+    // console.log("Got the window: " + window);
     // var AudioContext = window.AudioContext || window.webkitAudioContext;
     // console.log("AudioContext : " + AudioContext);
     const {XMLHttpRequest} = require("sdk/net/xhr");

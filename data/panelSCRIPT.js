@@ -1,6 +1,6 @@
 var button = document.getElementById("loginButton");
-var pickupDatesColumn = document.getElementById("pickupDates");
-var messagesColumn = document.getElementById("messages");
+var pickupDatesList = document.getElementById("pickupDatesList");
+var messagesList = document.getElementById("messagesList");
 var statusDiv = document.getElementById("status");
 var loggedIn = false;
 
@@ -10,7 +10,8 @@ self.port.on("showLoggedIn", function(/* pickupDates, messages */) {
   loggedIn = true;
   statusDiv.innerHTML = "<center><i>You are now logged in!</i><center>";
 
-  button.innerHTML = "Open Foodsharing";
+  button.innerHTML = "";
+  button.className = "openTab";
   button.onclick = function(){self.port.emit("openFsTab")};
 });
 
@@ -18,11 +19,12 @@ self.port.on("showLoggedOff", function()
 {
   console.log("panel received logoff-info");
   loggedIn = false;
-  messagesColumn.innerHTML = "";
-  pickupDatesColumn.innerHTML = "";
+  messagesList.innerHTML = "";
+  pickupDatesList.innerHTML = "";
   statusDiv.innerHTML = "<center><b>You are currently not logged in</b><br><sub>There is nothing to see here</sub><center>";
 
   button.innerHTML = "Login Now!";
+  button.className = "";
   button.onclick = function(){self.port.emit("login");};
 });
 
@@ -35,15 +37,18 @@ self.port.on("updateMsg", function(messages)
     var totalString = "";
     for(var i = 0 ; i < messages.length; i++)
     {
-      var element = '<span class="name">' + messages[i].name + '</span><br>';
-      element += '<span class="time">' + messages[i].time + '</span><br>';
-      element += '<span class="message">' + messages[i].message + '</span><br>';
+      var element;
+      element = '<li href:"https://foodsharing.de/?page=msg" onclick="self.port.emit("open", "something")">';
+        element += '<span class="name">' + messages[i].name + '</span><br>';
+        element += '<span class="time">' + messages[i].time + '</span><br>';
+        element += '<span class="message">' + messages[i].message + '</span><br>';
+      element += "</a></li>";
       if(i < messages.length - 1)
         element += "<br>";
 
       totalString += element;
     }
-    messagesColumn.innerHTML = "<b>Ungelesene Nachrichten: </b><br><br>" + totalString;
+    messagesList.innerHTML = totalString;
   }
   else
     console.log("But panel is in logged-off mode and will ignore");
@@ -54,17 +59,20 @@ self.port.on("updatePickups", function(pickupDates)
   console.log("panel received pickup update");
   if(loggedIn)
   {
-    var totalString = "<b>Heutige Abholtermine: </b><br><br>";
+    var totalString = "";
     for(var i = 0 ; i < pickupDates.length; i++)
     {
-      var element = '<span class="name">' + pickupDates[i].place_string + '</span><br>';
-      element += '<span class="time">' + pickupDates[i].time_string + '</span><br>';
+      var element;
+      element = '<li href="' + pickupDates[i].href + '"> <a class="liContent">';
+        element += '<span class="name">' + pickupDates[i].place_string + '</span><br>';
+        element += '<span class="time">' + pickupDates[i].time_string + '</span><br>';
+      element += "</a></li>"
       if(i < messages.length - 1)
         element += "<br>";
 
       totalString += element;
     }
-    pickupDatesColumn.innerHTML = totalString; 
+    pickupDatesList.innerHTML = totalString; 
   }
   else
     console.log("But panel is in logged-off mode and will ignore");

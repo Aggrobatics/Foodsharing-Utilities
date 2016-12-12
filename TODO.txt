@@ -1,9 +1,4 @@
 css design !!!
-createPickupObject(href) + tabs.open
 disclaimer?!
-change timers to webextensions!?
-interval floats
+change timers to webextensions!
 manage time over days
-login fails to work AGAIN
-upcoming pickup notification doesnt work
-playMessageSounds onChange
