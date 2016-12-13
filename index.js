@@ -519,7 +519,7 @@ function handleMsgDocReload(doc)
       var msg = convList[i].querySelector(".msg").innerHTML;
       var time = convList[i].querySelector(".time").innerHTML;
 
-      var msgObject = utils.createMessageObject(name, msg, time);
+      var msgObject = utils.MessageObject(name, msg, time);
       unreadMsgArray.push(msgObject);
       // console.log(msgObject);
     }
@@ -586,10 +586,10 @@ function handleMsgDocReload(doc)
           {
             console.log("pickup at " + placeElement.innerHTML + " is today");
             var timeDate = utils.parseTime(timeElement.innerHTML);
-            // console.log("at " + timeDate + " o'clock"); 
+            console.log("at " + timeDate + " o'clock"); 
             // console.log("at " + utils.extractTimeString(timeElement.innerHTML) + " o'clock");
    
-            var pickupObject = utils.createPickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
+            var pickupObject = utils.PickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
             pickupsTodayArray.push(pickupObject);
             // console.log(pickupObject);
 
@@ -603,8 +603,76 @@ function handleMsgDocReload(doc)
               pickupsText = pickupsText.concat("'" + placeElement.innerHTML + "' in " + remainingTime + " minutes;  "); 
             }
           }
+          else
+          {
+            var string = timeElement.innerHTML;
+            var date = new Date();
+
+            /* 
+            setDate
+            setMonth (0 = January)
+            setFullYear (not necessary?)
+
+
+            */ 
+            var day = string.slice(string.indexOf(", ") + 2, string.indexOf(". "));
+            var monthName = string.slice(string.indexOf(". ") + 2, string.lastIndexOf(", "));
+            var month;
+            switch (monthName)
+            {
+              case "Jan":
+                month = 0;
+                break;
+              case "Feb":
+                month = 1;
+                break;
+              case "Mär":
+                month = 2;
+                break;
+              case "Apr":
+                month = 3;
+                break;
+              case "Mai":
+                month = 4;
+                break;
+              case "Jun":
+                month = 5;
+                break;
+              case "Jul":
+                month = 6;
+                break;
+              case "Aug":
+                month = 7;
+                break;
+              case "Sep":
+                month = 8;
+                break;
+              case "Okt":
+                month = 9;
+                break;
+              case "Nov":
+                month = 10;
+                break;
+              case "Dez":
+                month = 11;
+                break;
+              default:
+                month = -1;
+                console.log("Could not recognize name of month!");
+            }
+            // var pickupObject = utils.PickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
+            console.log("Month: " + month);
+            console.log("Day: " + day);
+            var timeString = timeElement.innerHTML;
+            var clockString = timeString.slice(timeString.lastIndexOf(", ") + 2, timeString.length);
+            var time = utils.parseTime(clockString);
+            console.log("Hour: " + time.getHours());
+            console.log("Minute: " + time.getMinutes());
+          }
         });
-        console.log("check pickupArray.length: " + numberOfUpcomingDates);
+
+
+        console.log("number of upcoming pickups: " + numberOfUpcomingDates);
         if(numberOfUpcomingDates > 0)
         {
           console.log("trying to notify about upcoming pickups");

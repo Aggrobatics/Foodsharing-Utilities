@@ -8,6 +8,8 @@ console.log("utils.js loaded");
 
 exports.makeDocRequest = function (url, onSuccess, onError) {
     var config = {};
+
+    // handle private browsing
     if (privateBrowsing.isPrivate(browserWindows.activeWindow))
         config.mozAnon = true;
 
@@ -16,7 +18,6 @@ exports.makeDocRequest = function (url, onSuccess, onError) {
         console.log("creation of httpRequest failed");
         return false;
     }
-    // handle private browsing
 
     // ON SUCCESS
     httpRequest.onLoad = function () {
@@ -45,8 +46,10 @@ exports.makeDocRequest = function (url, onSuccess, onError) {
     httpRequest.send();
 };
 
-exports.makeLoginPost = function (doc, email, pass) 
-{
+// DOES NOT WORK :-()
+
+// exports.makeLoginPost = function (doc, email, pass) 
+// {
     // anonymous posting?!
 
     // console.log("makeLoginPost()");
@@ -79,8 +82,9 @@ exports.makeLoginPost = function (doc, email, pass)
     // form.appendChild(passField);
 
     // doc.body.appendChild(form);
-    doc.submit();
-};
+//     doc.submit();
+// };
+
 // TESTING ____________________________________________________________________________
 
 exports.checkLoginWithDom = function (document) {
@@ -140,7 +144,7 @@ function remainingT(timeDate) {
     return translateToMinsOfDay(timeDate) - translateToMinsOfDay(new Date());
 };
 
-exports.createPickupObject = createPickupObj;
+exports.PickupObject = createPickupObj;
 
 function createPickupObj(placeString, timeString, pageLink) {
     // console.log("utils.create called");
@@ -158,7 +162,7 @@ function createPickupObj(placeString, timeString, pageLink) {
     return obj;
 };
 
-exports.createMessageObject = createMsgObject;
+exports.MessageObject = createMsgObject;
 
 function createMsgObject(title, msg, moment) {
     var obj = {
