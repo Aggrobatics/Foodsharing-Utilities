@@ -1,4 +1,2 @@
-css design !!!
 disclaimer?!
 change timers to webextensions!
-manage time over days

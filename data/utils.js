@@ -1,6 +1,29 @@
+
+/* ***** BEGIN LICENSE BLOCK *****
+ 
+ * Author: Markus Schmieder (Aggrobatics)
+ 
+ * This file is part of The Firefox Foodsharing-Utilities Addon.
+ 
+ * The Firefox Foodsharing-Utilities Addon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ 
+ * The Firefox Foodsharing-Utilities Addon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ 
+ * You should have received a copy of the GNU General Public License
+ * along with The Firefox Foodsharing-Utilities Addon.  If not, see http://www.gnu.org/licenses/.
+ 
+ * ***** END LICENSE BLOCK ***** */
+
 const {XMLHttpRequest} = require("sdk/net/xhr");
 var browserWindows = require("sdk/windows").browserWindows;
 var privateBrowsing = require("sdk/private-browsing");
+var dateHelper = require("./dateHelper");
 
 console.log("utils.js loaded");
 
@@ -46,7 +69,7 @@ exports.makeDocRequest = function (url, onSuccess, onError) {
     httpRequest.send();
 };
 
-// DOES NOT WORK :-()
+// DOES NOT WORK :-(
 
 // exports.makeLoginPost = function (doc, email, pass) 
 // {
@@ -98,69 +121,22 @@ exports.checkLoginWithDom = function (document) {
     }
 };
 
-exports.extractTimeString = function (elementString) {
-    i_timeStart = "Heute, ".length - 1;
-    i_timeEnd = elementString.indexOf(" Uhr");
-    time = elementString.substring(i_timeStart, i_timeEnd);
-    return time;
-};
-
-exports.parseTime = parseT;
-
-
-function parseT(timeString) {
-    if (timeString == '') return null;
-
-    var time = timeString.match(/(\d+)(:(\d\d))?\s*(p?)/i);
-    if (time == null) return null;
-
-    var hours = parseInt(time[1], 10);
-    if (hours == 12 && !time[4]) {
-        hours = 0;
-    }
-    else {
-        hours += (hours < 12 && time[4]) ? 12 : 0;
-    }
-    var d = new Date();
-    d.setHours(hours);
-    d.setMinutes(parseInt(time[3], 10) || 0);
-    d.setSeconds(0, 0);
-    return d;
-};
-
-exports.translateToMinutesOfDay = translateToMinsOfDay;
-
-function translateToMinsOfDay(date) {
-    // console.log("utils.transl called");
-    return (date.getHours() * 60) + date.getMinutes();
-};
-
-
-
-exports.remainingTime = remainingT;
-
-function remainingT(timeDate) {
-    // console.log("utils.remaining called");
-    return translateToMinsOfDay(timeDate) - translateToMinsOfDay(new Date());
-};
-
-exports.PickupObject = createPickupObj;
-
-function createPickupObj(placeString, timeString, pageLink) {
-    // console.log("utils.create called");
+exports.PickupObject = function(placeString, timeString, pageLink) {
+    console.log("utils.createSimplePickupObj()");
 
     // cannot call parseT to fill property for some reason. crashes every time
     var obj = {
         place_string: placeString,
         time_string: timeString,
         href: pageLink,
-        date_formatted: parseT(timeString), // dateFormatted, //  
+        date_formatted: dateHelper.parseTime(timeString), // dateFormatted, //  
         minutes_remaining: function () {
-            return remainingT(this.date_formatted);
+            return dateHelper.remainingTime(this.date_formatted);
         }
     };
     return obj;
 };
+
 
 exports.MessageObject = createMsgObject;
 
@@ -200,3 +176,4 @@ exports.currentWindow = function()
 {
     return require('sdk/window/utils').getMostRecentBrowserWindow();
 }
+

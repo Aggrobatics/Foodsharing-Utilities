@@ -1,8 +1,31 @@
+
+/* ***** BEGIN LICENSE BLOCK *****
+ 
+ * Author: Markus Schmieder (Aggrobatics)
+ 
+ * This file is part of The Firefox Foodsharing-Utilities Addon.
+ 
+ * The Firefox Foodsharing-Utilities Addon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ 
+ * The Firefox Foodsharing-Utilities Addon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ 
+ * You should have received a copy of the GNU General Public License
+ * along with The Firefox Foodsharing-Utilities Addon.  If not, see http://www.gnu.org/licenses/.
+ 
+ * ***** END LICENSE BLOCK ***** */
+
 try
 {
 
 var data = require("sdk/self").data;
 var utils = require("./data/utils");
+var dateHelper = require("./data/dateHelper");
 var settings = require("sdk/simple-prefs").prefs;
 // pickupIntervalTime
 // msgIntervalTime
@@ -10,39 +33,6 @@ var settings = require("sdk/simple-prefs").prefs;
 // autoLogin
 // playSounds
 // soundFileNr
-
-require("sdk/simple-prefs").on("soundFileNr", onSoundPrefChange)
-function onSoundPrefChange(prefName) 
-{
-  console.log("The preference " + 
-              prefName + 
-              " value has changed!");
-  switch (prefName)
-  {
-    case "soundFileNr":
-      console.log("And it was the sound file!");
-      msgSoundURL = data.url(utils.getSoundFileName(settings.soundFileNr));
-      playMsgSound();
-      break;
-    case "msgIntervalTime":
-      console.log("And it was msgIntervalTime. Restarting Interval");
-      clearInterval(msgIntervalID);
-      msgIntervalID = setInterval(function() 
-      {
-        requestMsgDocAndHandle();
-      }, settings.msgIntervalTime * 60 * 1000);
-      break;
-    case "pickupIntervalTime":
-      console.log("And it was pickupIntervalTime. Restarting Interval");
-      clearInterval(pickupIntervalID);
-      pickupIntervalID = setInterval(function() 
-      {
-        requestPickupDocAndHandle();
-      }, settings.pickupIntervalTime * 60 * 1000);
-      break;
-  }
-}
-
 
 
 // Objects
@@ -54,13 +44,14 @@ var notifications = require("sdk/notifications");
 // Arrays
 var foodsharingTabs = [];
 var unreadMsgArray = [];
-var pickupsTodayArray = [];
+var pickupsArrayAll = [];
 
 // Numbers
 var msgIntervalID;
 var blinkIntervalID;
 var pickupIntervalID;
 var checkLoginIntervalID;
+var failedLoginTimerID = 0;
 var failedLogins = 0;
 var numberOfUpcomingDates = 0;
 
@@ -69,7 +60,7 @@ var email;
 var pass;
 
 // Functions
-var { setInterval, clearInterval, setTimeout } = require("sdk/timers");
+var { setInterval, clearInterval, setTimeout, clearTimeout } = require("sdk/timers");
 
 // Strings
 var buttonActive = "#00AAAA";
@@ -131,6 +122,53 @@ else
 {
   messageURL = "https://foodsharing.de/?page=msg";
 }
+
+
+// PREFERENCES ____________________________________________________________________________
+
+require("sdk/simple-prefs").on("soundFileNr", function(prefName) 
+{
+  console.log("soundFileNr has changed!");
+  msgSoundURL = data.url(utils.getSoundFileName(settings.soundFileNr));
+  playMsgSound();
+});
+
+require("sdk/simple-prefs").on("msgIntervalTime", function(prefName) 
+{
+  var output = "msgIntervalTime has changed. ";
+  if(b_loggedIn)
+  {
+    output += "Restarting Interval";
+    clearInterval(msgIntervalID);
+    msgIntervalID = setInterval(function() 
+    {
+      requestMsgDocAndHandle();
+    }, settings.msgIntervalTime * 60 * 1000);
+  }
+  else
+    output += "But not logged in. No change necessary";
+  
+  console.log(output);
+});
+
+require("sdk/simple-prefs").on("pickupIntervalTime", function(prefName) 
+{
+  var output = "pickupIntervalTime has changed. ";
+  if(b_loggedIn)
+  {
+    output += "Restarting Interval";
+    clearInterval(pickupIntervalID);
+    pickupIntervalID = setInterval(function() 
+    {
+      requestPickupDocAndHandle();
+    }, settings.pickupIntervalTime * 60 * 1000);
+  }
+  else
+    output += "But not logged in. No change necessary";
+
+  console.log(output);
+});
+
 
 // TABS         ____________________________________________________________________________
 
@@ -238,7 +276,6 @@ loginWorker.port.on("loginPerformed", function(value)
     str += ". Login-status has changed. Handling...";
   console.log("received message from loginWorker");
 
-
   switch(value) 
   {
     case 1:
@@ -324,6 +361,12 @@ panel.port.on("open", function(link)
 function handleNewLogin()
 {
   console.log("handleNewLogin()")
+
+  if(failedLoginTimerID)
+  {
+     clearTimeout(failedLoginTimerID);
+     console.log("cleared failedLoginTimerID");
+  }
 
   if(!b_loggedIn)
   {
@@ -544,438 +587,325 @@ function handleMsgDocReload(doc)
   }
 }  
 
-  function requestPickupDocAndHandle()
+function requestPickupDocAndHandle()
+{
+  utils.makeDocRequest(pickupURL, 
+  function(doc) // Success function
   {
-    utils.makeDocRequest(pickupURL, 
-    function(doc) // Success function
+      handlePickupDocReload(doc);
+  }, 
+  function() // Error function
+  {
+    console.log("failed to open htmlTempStorage.html file");
+  });
+  return;
+}
+
+function handlePickupDocReload(doc)
+{
+  console.log("handlePickupDocReload()");
+  pickupsArrayAll = [];
+
+  var dates = doc.querySelector(".datelist").querySelectorAll(".ui-corner-all");
+  console.log("there are " + dates.length + " pickups registered. Notify me " + settings.notificationTime + " minutes in advance!");
+
+  if(dates.length > 0)
+  {
+      var pickupsText = "";
+      numberOfUpcomingDates = 0;
+
+      dates.forEach(function(item)
+      {
+        var pageLink = item.href.slice(item.href.indexOf("/?page="), item.href.length) || "";
+        pageLink = "https://foodsharing.de" + pageLink;
+        // console.log("href: " + pageLink);
+        var timeElement = item.querySelector("span:nth-child(1)");
+        var placeElement = item.querySelector("span:nth-child(2)");
+        // console.log("Place: " + placeElement.innerHTML);
+        // console.log("Time: " + timeElement.innerHTML);
+        
+
+        // var dateFormatted = dateHelper.parseTime(timeElement.innerHTML);
+        // console.log("dateHelper says: " + timeFormatted);
+        var pickupObject = utils.PickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
+        console.log(pickupObject);
+        pickupsArrayAll.push(pickupObject);
+
+        // CHECK FOR TODAY's PICKUPS
+        if(Boolean(timeElement.innerHTML.search("Heute")+1))
+        {
+          console.log("pickup at " + placeElement.innerHTML + " is today");
+
+          var remainingTime = pickupObject.minutes_remaining();
+          console.log(remainingTime + " minutes remaining");
+
+          if((remainingTime < settings.notificationTime) && (remainingTime > 0))
+          {
+            console.log("That is soon! NOTIFY!!!");
+            numberOfUpcomingDates = numberOfUpcomingDates + 1;
+            pickupsText = pickupsText.concat("'" + placeElement.innerHTML + "' in " + remainingTime + " minutes;  "); 
+          }
+        }
+      });
+
+
+      console.log("number of upcoming pickups: " + numberOfUpcomingDates);
+      if(numberOfUpcomingDates > 0)
+      {
+        console.log("trying to notify about upcoming pickups");
+        var str = "You have " + numberOfUpcomingDates + " pickup(s) coming up soon: ";
+        str = str + pickupsText;
+        showNotification(str);
+      }
+      panel.port.emit("updatePickups", pickupsArrayAll);
+
+  }
+  return numberOfUpcomingDates;
+}
+
+
+function stopBlinkInterval()
+{
+  if(Boolean(blinkIntervalID))
+  {
+    // interval is running, so stop it now
+    console.log("stopping blinkInterval now");
+    clearInterval(blinkIntervalID);
+    blinkIntervalID = 0;
+    b_originalTabText = true;
+    switchTabsTitles(b_originalTabText, button.badge);
+  }
+}
+
+function switchTabsTitles(value, messages)
+{
+  var blinkText;
+  
+  if(!value)
+    blinkText = "(" + messages + ") New Messages!";
+  else if(messages > 0)
+    blinkText = "(" + messages + ") Foodsharing | Restlos Gluecklich";
+  else
+    blinkText = "Foodsharing | Restlos Gluecklich";
+
+  // console.log("changing tabs' titles to '" + blinkText + "'");
+
+  for (i = 0; i < foodsharingTabs.length; i++) {
+    foodsharingTabs[i].title = blinkText;
+  } 
+}
+
+// If you pass it a single property, only credentials matching that property are returned:
+function getPasswordsForFsAndLogin() 
+{
+  // console.log("getPasswordsForFsAndLogin()");
+  if(b_passwordPresent)                                                                   // Only for debugging purposes more or lesss
+  {
+    console.log("b_passwordPresent = true. Sending login now");
+    sendLoginRequest();
+    failedLoginTimerID = setTimeout(function()
     {
-        handlePickupDocReload(doc);
-    }, 
-    function() // Error function
-    {
-      console.log("failed to open htmlTempStorage.html file");
-    });
+      console.log("It seems the login functionality does not work here");
+      showNotification("It seems the login-function does not work on your system. I am very sorry for that!");
+    }, 5000); 
     return;
   }
-
-  function handlePickupDocReload(doc)
+  else
   {
-    console.log("handlePickupDocReload()");
-    pickupsTodayArray = [];
+    require("sdk/passwords").search({
+    url: "https://foodsharing.de",
+    onComplete: function onComplete(credentials) {
+      if(credentials.length > 0)
+      {
+        console.log("there are saved passwords!");
+        b_passwordPresent = true;
+        email = credentials[0].username;
+        pass = credentials[0].password;
 
-    var dates = doc.querySelector(".datelist").querySelectorAll(".ui-corner-all");
-    console.log("there are " + dates.length + " pickups registered. Notify me " + settings.notificationTime + " minutes in advance!");
+        sendLoginRequest();
+        return;
+      }
+      else
+      {
+        console.log("there are NO saved passwords!");
+        showNotification("Could not find login data! Please make sure you have stored your login data with Firefox (Master Password is recommended!), or deactivate auto-login under settings");
+        return;
+      }
+    }
+    });
+  }
+}
 
-    if(dates.length > 0)
+function sendLoginRequest()
+{
+  if(b_passwordPresent)
+  {
+    if(b_useLoginRequest)
     {
-        var pickupsText = "";
-        numberOfUpcomingDates = 0;
+      console.log("sending login POST");
+      utils.makeDocRequest(data.url("submitForm.html"), 
+      function(submitForm) // OnSuccess
+      {
+        console.log("Got submitForm.html! Passing to makeLoginPost() now");
+        // submit loginData using submitForm.html
+        utils.makeLoginPost(submitForm, email, pass);
 
-        dates.forEach(function(item)
+        console.log("starting loginCheck Interval");
+        // And start checking (repeatedly) for login....
+        checkLoginIntervalID = setInterval(function() 
         {
-          var pageLink = item.href.slice(item.href.indexOf("/?page="), item.href.length) || "";
-          pageLink = "https://foodsharing.de" + pageLink;
-          console.log("href: " + pageLink);
-          var timeElement = item.querySelector("span:nth-child(1)");
-          var placeElement = item.querySelector("span:nth-child(2)");
-          // console.log("Place: " + placeElement.innerHTML);
-          // console.log("Time: " + timeElement.innerHTML);
-
-          // CHECK FOR TODAY's PICKUPS
-          if(Boolean(timeElement.innerHTML.search("Heute")+1))
+          console.log("loginCheck tick");
+          utils.makeDocRequest("loginURL", function(doc)
           {
-            console.log("pickup at " + placeElement.innerHTML + " is today");
-            var timeDate = utils.parseTime(timeElement.innerHTML);
-            console.log("at " + timeDate + " o'clock"); 
-            // console.log("at " + utils.extractTimeString(timeElement.innerHTML) + " o'clock");
-   
-            var pickupObject = utils.PickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
-            pickupsTodayArray.push(pickupObject);
-            // console.log(pickupObject);
+              console.log("requesting page for loginCheck");
+              if(utils.checkLoginWithDom(doc))
+              {
+                console.log("checkLoginWithDom() returned true");
+                clearInterval(checkLoginIntervalID);
+                b_loggedIn = true;
+                handleNewLogin();
+              }
+              else
+              {
+                console.log("Checked site. still not logged in!");
+              }
+          },
+          function()
+          {
+            console.log("Request to " + loginURL + " for loginCheck failed");
+          });
+        }, 2000);
+      },
+      function()  // onError
+      {
+        console.log("could not open submitForm.html");
+      });
+    }
+    else
+    {
+      loginWorker.port.emit("login", email, pass);
+    }
+  }
+  else
+  {
+    console.log("Cannot send login-request without email and password!");
+  }
 
-            var remainingTime = pickupObject.minutes_remaining();
-            console.log(remainingTime + " minutes remaining");
+}
 
-            if((remainingTime < settings.notificationTime) && (remainingTime > 0))
-            {
-              console.log("That is soon! NOTIFY!!!");
-              numberOfUpcomingDates = numberOfUpcomingDates + 1;
-              pickupsText = pickupsText.concat("'" + placeElement.innerHTML + "' in " + remainingTime + " minutes;  "); 
-            }
+function checkLoginRepeatedly()
+{
+  var numberOfChecks = 0;
+  checkLoginIntervalID = setInterval(function() 
+  {
+    numberOfChecks += 1;
+    console.log("loginCheck tick. Attempt: " + numberOfChecks);
+    if(numberOfChecks <= 5)
+    {
+      utils.makeDocRequest("https://foodsharing.de", function(doc)
+      {
+          console.log("requesting page for loginCheck");
+          console.log("loginbar index: " + doc.getElementById("loginbar").outerHTML);
+          if(utils.checkLoginWithDom(doc))
+          {
+            console.log("checkLoginWithDom() returned true");
+            clearInterval(checkLoginIntervalID);
+            b_loggedIn = true;
+            handleNewLogin();
           }
           else
           {
-            var string = timeElement.innerHTML;
-            var date = new Date();
-
-            /* 
-            setDate
-            setMonth (0 = January)
-            setFullYear (not necessary?)
-
-
-            */ 
-            var day = string.slice(string.indexOf(", ") + 2, string.indexOf(". "));
-            var monthName = string.slice(string.indexOf(". ") + 2, string.lastIndexOf(", "));
-            var month;
-            switch (monthName)
-            {
-              case "Jan":
-                month = 0;
-                break;
-              case "Feb":
-                month = 1;
-                break;
-              case "Mär":
-                month = 2;
-                break;
-              case "Apr":
-                month = 3;
-                break;
-              case "Mai":
-                month = 4;
-                break;
-              case "Jun":
-                month = 5;
-                break;
-              case "Jul":
-                month = 6;
-                break;
-              case "Aug":
-                month = 7;
-                break;
-              case "Sep":
-                month = 8;
-                break;
-              case "Okt":
-                month = 9;
-                break;
-              case "Nov":
-                month = 10;
-                break;
-              case "Dez":
-                month = 11;
-                break;
-              default:
-                month = -1;
-                console.log("Could not recognize name of month!");
-            }
-            // var pickupObject = utils.PickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
-            console.log("Month: " + month);
-            console.log("Day: " + day);
-            var timeString = timeElement.innerHTML;
-            var clockString = timeString.slice(timeString.lastIndexOf(", ") + 2, timeString.length);
-            var time = utils.parseTime(clockString);
-            console.log("Hour: " + time.getHours());
-            console.log("Minute: " + time.getMinutes());
+            console.log("Checked site. still not logged in!");
           }
-        });
-
-
-        console.log("number of upcoming pickups: " + numberOfUpcomingDates);
-        if(numberOfUpcomingDates > 0)
-        {
-          console.log("trying to notify about upcoming pickups");
-          var str = "You have " + numberOfUpcomingDates + " pickup(s) coming up soon: ";
-          str = str + pickupsText;
-          showNotification(str);
-          // console.log(str);
-        }
-        panel.port.emit("updatePickups", pickupsTodayArray);
-
-    }
-    return numberOfUpcomingDates;
-  }
-
-
-  function stopBlinkInterval()
-  {
-    if(Boolean(blinkIntervalID))
-    {
-      // interval is running, so stop it now
-      console.log("stopping blinkInterval now");
-      clearInterval(blinkIntervalID);
-      blinkIntervalID = 0;
-      b_originalTabText = true;
-      switchTabsTitles(b_originalTabText, button.badge);
-    }
-  }
-
-  function switchTabsTitles(value, messages)
-  {
-    var blinkText;
-    
-    if(!value)
-      blinkText = "(" + messages + ") New Messages!";
-    else if(messages > 0)
-      blinkText = "(" + messages + ") Foodsharing | Restlos Gluecklich";
-    else
-      blinkText = "Foodsharing | Restlos Gluecklich";
-
-    // console.log("changing tabs' titles to '" + blinkText + "'");
-
-    for (i = 0; i < foodsharingTabs.length; i++) {
-      foodsharingTabs[i].title = blinkText;
-    } 
-  }
-
-  // If you pass it a single property, only credentials matching that property are returned:
-  function getPasswordsForFsAndLogin() 
-  {
-    // console.log("getPasswordsForFsAndLogin()");
-    if(b_passwordPresent)                                                                   // Only for debugging purposes more or lesss
-    {
-      console.log("b_passwordPresent = true. Sending login now");
-      sendLoginRequest();
-      return;
-    }
-    else
-    {
-      require("sdk/passwords").search({
-      url: "https://foodsharing.de",
-      onComplete: function onComplete(credentials) {
-        if(credentials.length > 0)
-        {
-          console.log("there are saved passwords!");
-          b_passwordPresent = true;
-          email = credentials[0].username;
-          pass = credentials[0].password;
-
-          sendLoginRequest();
-          return;
-        }
-        else
-        {
-          console.log("there are NO saved passwords!");
-          showNotification("Could not find login data! Please make sure you have stored your login data with Firefox (Master Password is recommended!), or deactivate auto-login under settings");
-          return;
-        }
-      }
+      },
+      function()
+      {
+        console.log("Request to " + loginURL + " for loginCheck failed");
       });
     }
-  }
-
-  function sendLoginRequest()
-  {
-    if(b_passwordPresent)
-    {
-      if(b_useLoginRequest)
-      {
-        console.log("sending login POST");
-        utils.makeDocRequest(data.url("submitForm.html"), 
-        function(submitForm) // OnSuccess
-        {
-          console.log("Got submitForm.html! Passing to makeLoginPost() now");
-          // submit loginData using submitForm.html
-          utils.makeLoginPost(submitForm, email, pass);
-
-          console.log("starting loginCheck Interval");
-          // And start checking (repeatedly) for login....
-          checkLoginIntervalID = setInterval(function() 
-          {
-            console.log("loginCheck tick");
-            utils.makeDocRequest("loginURL", function(doc)
-            {
-                console.log("requesting page for loginCheck");
-                if(utils.checkLoginWithDom(doc))
-                {
-                  console.log("checkLoginWithDom() returned true");
-                  clearInterval(checkLoginIntervalID);
-                  b_loggedIn = true;
-                  handleNewLogin();
-                }
-                else
-                {
-                  console.log("Checked site. still not logged in!");
-                }
-            },
-            function()
-            {
-              console.log("Request to " + loginURL + " for loginCheck failed");
-            });
-          }, 2000);
-        },
-        function()  // onError
-        {
-          console.log("could not open submitForm.html");
-        });
-      }
-      else
-      {
-        loginWorker.port.emit("login", email, pass);
-      }
-    }
     else
     {
-      console.log("Cannot send login-request without email and password!");
+      console.log("giving up on checking");
+      showNotification("It seems the login-function does not work on your system. I am very sorry for that!");
+      clearInterval(checkLoginIntervalID);
+      b_loggedIn = false;
     }
-
-  }
-
-  function checkLoginRepeatedly()
-  {
-    var numberOfChecks = 0;
-    checkLoginIntervalID = setInterval(function() 
-    {
-      numberOfChecks += 1;
-      console.log("loginCheck tick. Attempt: " + numberOfChecks);
-      if(numberOfChecks <= 5)
-      {
-        utils.makeDocRequest("https://foodsharing.de", function(doc)
-        {
-            console.log("requesting page for loginCheck");
- 						console.log("loginbar index: " + doc.getElementById("loginbar").outerHTML);
-            if(utils.checkLoginWithDom(doc))
-            {
-              console.log("checkLoginWithDom() returned true");
-              clearInterval(checkLoginIntervalID);
-              b_loggedIn = true;
-              handleNewLogin();
-            }
-            else
-            {
-              console.log("Checked site. still not logged in!");
-            }
-        },
-        function()
-        {
-          console.log("Request to " + loginURL + " for loginCheck failed");
-        });
-      }
-      else
-      {
-        console.log("giving up on checking");
-        clearInterval(checkLoginIntervalID);
-        b_loggedIn = false;
-      }
-    }, 2000);
-  }
+  }, 2000);
+}
 
 
-  function playMsgSound()
-  {
-    console.log("playSound("+ msgSoundURL + ")");
+function playMsgSound()
+{
+  console.log("playSound("+ msgSoundURL + ")");
 
-    var window = utils.currentWindow();
+  var window = utils.currentWindow();
 
-    // console.log("Got the window: " + window);
-    // var AudioContext = window.AudioContext || window.webkitAudioContext;
-    // console.log("AudioContext : " + AudioContext);
-    const {XMLHttpRequest} = require("sdk/net/xhr");
-    var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    var source = audioCtx.createBufferSource();
-    var request = new XMLHttpRequest();
-
-    request.open('GET', msgSoundURL, true);
-
-    request.responseType = 'arraybuffer';
-
-
-    request.onload = function() {
-      var audioData = request.response;
-
-      audioCtx.decodeAudioData(audioData, function(buffer) {
-          source.buffer = buffer;
-
-          source.connect(audioCtx.destination);
-          source.loop = false;
-        },
-
-        function(e){"Error with decoding audio data" + e.err});
-
-    }
-
-    request.send();
-    source.start(0);      
-  }
-
-  function showNotification(text)
-  {
-    console.log("showNotification()");
-    if(text)
-    {
-      if(b_readyForNextNotify)
-      {
-        b_readyForNextNotify = false;
-        console.log("showing notification");
-        notifications.notify({
-          title: "foodsharing.de",
-          text: text,
-          iconURL: data.url("gabel-64.png")
-        });
-        setTimeout(function()
-        {
-          console.log("Timeout done. Notify-System is open again");
-          b_readyForNextNotify = true;
-        }, 3000); 
-      }
-      else
-        console.log("notification system blocked! Notify is rejected");
-    }
-    else
-      console.log("Sorry dawg! No text, no notification!");
-  }
-
-// ACTIONS ____________________________________________________________________________
-
-  if(settings.autoLogin)
-  {
-    console.log("autoLogin = true");
-    getPasswordsForFsAndLogin();
-  }
-
-// EXTRAS and DEBUGGING____________________________________________________________________________
-
-  // var window;
-  // if (window === null || typeof window !== "object") 
-  // {
-  //     window = require('sdk/window/utils').getMostRecentBrowserWindow();
-  // }
   // console.log("Got the window: " + window);
   // var AudioContext = window.AudioContext || window.webkitAudioContext;
   // console.log("AudioContext : " + AudioContext);
-  // const {XMLHttpRequest} = require("sdk/net/xhr");
-  // var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  // var source;
+  const {XMLHttpRequest} = require("sdk/net/xhr");
+  var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  var source = audioCtx.createBufferSource();
+  var request = new XMLHttpRequest();
 
-  // function getData(filePath) 
-  // {
-  //   source = audioCtx.createBufferSource();
-  //   var request = new XMLHttpRequest();
+  request.open('GET', msgSoundURL, true);
 
-  //   request.open('GET', filePath, true);
-
-  //   request.responseType = 'arraybuffer';
+  request.responseType = 'arraybuffer';
 
 
-  //   request.onload = function() {
-  //     var audioData = request.response;
+  request.onload = function() {
+    var audioData = request.response;
 
-  //     audioCtx.decodeAudioData(audioData, function(buffer) {
-  //         source.buffer = buffer;
+    audioCtx.decodeAudioData(audioData, function(buffer) {
+        source.buffer = buffer;
 
-  //         source.connect(audioCtx.destination);
-  //         source.loop = false;
-  //       },
+        source.connect(audioCtx.destination);
+        source.loop = false;
+      },
 
-  //       function(e){"Error with decoding audio data" + e.err});
+      function(e){"Error with decoding audio data" + e.err});
 
-  //   }
+  }
 
-  //   request.send();
-  // }
+  request.send();
+  source.start(0);      
+}
 
-  // function playMsgSound()
-  // {
-  //   console.log("playSound("+ msgSoundURL + ")");
-  //     // var intervalID = window.setInterval(function()
-  //     // {
-  //       // getData(filePath);
-  //       getData(msgSoundURL);
-  //       source.start(0);  
-  //     // }, 5000);
-      
-  // }
+function showNotification(text)
+{
+  console.log("showNotification()");
+  if(text)
+  {
+    if(b_readyForNextNotify)
+    {
+      b_readyForNextNotify = false;
+      console.log("showing notification");
+      notifications.notify({
+        title: "foodsharing.de",
+        text: text,
+        iconURL: data.url("gabel-64.png")
+      });
+      setTimeout(function()
+      {
+        console.log("Timeout done. Notify-System is open again");
+        b_readyForNextNotify = true;
+      }, 3000); 
+    }
+    else
+      console.log("notification system blocked! Notify is rejected");
+  }
+  else
+    console.log("Sorry dawg! No text, no notification!");
+}
+
+// ACTIONS ____________________________________________________________________________
+
+if(settings.autoLogin)
+{
+  console.log("autoLogin = true");
+  getPasswordsForFsAndLogin();
+}
+
 
 }
 catch (e)
