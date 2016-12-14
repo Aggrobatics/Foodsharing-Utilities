@@ -138,9 +138,7 @@ exports.PickupObject = function(placeString, timeString, pageLink) {
 };
 
 
-exports.MessageObject = createMsgObject;
-
-function createMsgObject(title, msg, moment) {
+exports.MessageObject = function(title, msg, moment) {
     var obj = {
         name: title,
         message: msg,
