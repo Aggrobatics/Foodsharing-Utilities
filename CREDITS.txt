@@ -1,8 +1,5 @@
-change EVERYTHING to webextensions!
-Credits
+The following files have been used in the creation of Foodsharing-Utilities Firefox-Addon
 
-
-------------- Creative Commons 0:
 
 Filename: 	Bite (Apple)
 Name in App:	Apple
@@ -36,9 +33,6 @@ Licence:	Creative Commons 0
 Changes:	None
 
 
------------- Attribution Noncommercial Licence:
-
-
 Filename:	KITCHEN common sounds » 01331 one bite of carrot 2.wav 
 Name in App:	Carrot
 Author:		Robinhood76
@@ -46,8 +40,6 @@ Weblink:	https://freesound.org/people/Robinhood76/sounds/82604/
 Changes:	None
 Licence:	Attribution Noncommercial Licence
 
-
------------- Attribution Licence:
 
 Filename:	VegetableEffects » CeleryBite1.wav 
 Name in App:	Celery

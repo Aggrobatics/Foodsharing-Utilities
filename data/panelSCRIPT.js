@@ -24,8 +24,19 @@ var button = document.getElementById("loginButton");
 var pickupDatesList = document.getElementById("pickupDatesList");
 var messagesList = document.getElementById("messagesList");
 var statusDiv = document.getElementById("status");
+var body = document.body;
 var loggedIn = false;
 
+body.addEventListener("click", function(event)
+{
+  element = event.target.closest('a.liContent');
+  if((element) && (element.href))
+  {
+    event.preventDefault();
+    event.stopPropagation();
+    self.port.emit("openTab", element.href);
+  }
+});
 
 self.port.on("showLoggedIn", function(/* pickupDates, messages */) {
   console.log("panel received login-info");
@@ -34,7 +45,7 @@ self.port.on("showLoggedIn", function(/* pickupDates, messages */) {
 
   button.innerHTML = "";
   button.className = "openTab";
-  button.onclick = function(){self.port.emit("openFsTab")};
+  button.onclick = function(){self.port.emit("openTab", "https://foodsharing.de")};
 });
 
 self.port.on("showLoggedOff", function()
@@ -60,7 +71,7 @@ self.port.on("updateMsg", function(messages)
     for(var i = 0 ; i < messages.length; i++)
     {
       var element;
-      element = '<li href:"https://foodsharing.de/?page=msg" onclick="self.port.emit("open", "something")">';
+      element = '<li> <a href="https://foodsharing.de/?page=msg" class="liContent">';
         element += '<span class="name">' + messages[i].name + '</span><br>';
         element += '<span class="time">' + messages[i].time + '</span><br>';
         element += '<span class="message">' + messages[i].message + '</span><br>';
@@ -85,7 +96,7 @@ self.port.on("updatePickups", function(pickupDates)
     for(var i = 0 ; i < pickupDates.length; i++)
     {
       var element;
-      element = '<li href="' + pickupDates[i].href + '"> <a class="liContent">';
+      element = '<li> <a href="' + pickupDates[i].href + '"  class="liContent">';
         element += '<span class="name">' + pickupDates[i].place_string + '</span><br>';
         element += '<span class="time">' + pickupDates[i].time_string + '</span><br>';
       element += "</a></li>"

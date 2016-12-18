@@ -23,6 +23,7 @@
 try
 {
 
+
 var data = require("sdk/self").data;
 var utils = require("./data/utils");
 var dateHelper = require("./data/dateHelper");
@@ -84,7 +85,7 @@ var b_useFakeData = true;
 var b_useLoginRequest = false;
 var b_useFakeLogin = true;
 var b_useFakePickupDates = true;
-var b_useFakeMessages = false;
+var b_useFakeMessages = true;
                                                                         // REMOVE THIS LATER ON!
 if(b_useFakeData)
 {
@@ -331,16 +332,16 @@ onHide : function()
       button.state('window', {checked: false});
   }
 });
-panel.resize(770, 500);
+panel.resize(750, 500);
 
 panel.port.on("login", function(){
   console.log("received button click");
   getPasswordsForFsAndLogin();
 });
 
-panel.port.on("openFsTab", function()
+panel.port.on("openTab", function(address)
 {
-  tabs.open("https://foodsharing.de");
+  tabs.open(address);
 });
 
 // does not work, as checkbox does not fire any events!

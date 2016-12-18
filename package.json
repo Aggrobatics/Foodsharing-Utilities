@@ -37,7 +37,7 @@
 	{
 		"name": "notificationTime",
 		"title": "Notification Threshold:",
-		"description": "I hereby define what 'soon' means in 'minutes before the deadline' (0 deactivates checks and any notifications; only notifies for 'today')",
+		"description": "I hereby define what 'soon' means in 'minutes before the deadline' (0 deactivates checks and any notifications; only notifies about today's pickups)",
 		"type": "integer",
 		"value": 60
 	},

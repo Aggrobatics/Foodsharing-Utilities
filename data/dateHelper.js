@@ -38,28 +38,28 @@ exports.parseTime = function(timeString) {
         var month;
         switch (monthName)
         {
-            case "Jan":
+            case "Januar":
                 month = 0;
                 break;
-            case "Feb":
+            case "Februar":
                 month = 1;
                 break;
-            case "Mär":
+            case "März":
                 month = 2;
                 break;
-            case "Apr":
+            case "April":
                 month = 3;
                 break;
             case "Mai":
                 month = 4;
                 break;
-            case "Jun":
+            case "Juni":
                 month = 5;
                 break;
-            case "Jul":
+            case "Juli":
                 month = 6;
                 break;
-            case "Aug":
+            case "August":
                 month = 7;
                 break;
             case "Sep":
@@ -123,3 +123,72 @@ exports.remainingTime = function(timeDate) {
 function translateToMinsOfDay(date) {
     return (date.getHours() * 60) + date.getMinutes();
 };
+
+/*
+
+Website date-translations:
+
+
+['month_1'] = 'Januar';
+
+['month_2'] = 'Februar';
+
+['month_3'] = 'März';
+
+['month_4'] = 'April';
+
+['month_5'] = 'Mai';
+
+['month_6'] = 'Juni';
+
+['month_7'] = 'Juli';
+
+['month_8'] = 'August';
+
+['month_9'] = 'Sep';
+
+['month_10'] = 'Okt';
+
+['month_11'] = 'Nov';
+
+['month_12'] = 'Dez';
+
+['smonth_1'] = 'Jan';
+
+['smonth_2'] = 'Feb';
+
+['smonth_3'] = 'März';
+
+['smonth_4'] = 'Apr';
+
+['smonth_5'] = 'Mai';
+
+['smonth_6'] = 'Juni';
+
+['smonth_7'] = 'Juli';
+
+['smonth_8'] = 'Aug';
+
+['smonth_9'] = 'Sep';
+
+['smonth_10'] = 'Okt';
+
+['smonth_11'] = 'Nov';
+
+['smonth_12'] = 'Dez';
+
+['monday'] = 'Montag';
+
+['tuesday'] = 'Dienstag';
+
+['wednesday'] = 'Mittwoch';
+
+['thursday'] = 'Donnerstag';
+
+['friday'] = 'Freitag';
+
+['saturday'] = 'Samstag';
+
+['sunday'] = 'Sonntag';
+
+*/
