@@ -195,7 +195,7 @@ tabs.on('ready', function(tab)
   // tab is in array (0 equals to false)
   if (Boolean(index+1)) {
     // ...and does not match website anymore
-    if(!tab.url.match("https://foodsharing.de*")) {
+    if(!tab.url.match("https://foodsharing*")) {
       // remove tab
       foodsharingTabs.splice( index, 1 );
       console.log("New tabArray after remove: " + foodsharingTabs);
