@@ -24,7 +24,7 @@ console.log("Start of login script. Received new doc");
 var b_usePost = false;
 
 // if logged in, inform main. 
-if(document.querySelector("#infobar"))//.getElementsByClassName("msg").getElementsByClassName("badge"))
+if(document.querySelector("#infobar"))
 {
 	console.log("login successful! Informing main...");
 	self.port.emit("loginPerformed", 1);
@@ -45,12 +45,6 @@ self.port.on("login", function(email, password)
 		if(b_usePost)
 		{
 			console.log("using POST. email: " + email + "; password: " + password);
-			// var data = new FormData();
-			
-			// data.append("page", "login");
-			// data.append("ref", "/?page=dashboard");
-			// data.append('email_adress', email);
-			// data.append('password', password);
 
 			var data = "email_adress=" + email + "&password=" + password;
 
@@ -69,26 +63,11 @@ self.port.on("login", function(email, password)
 						console.log("status = 200. Object: " + Boolean(this.responseText));
 						console.log("loginbar index: " + this.responseText.search('id="loginbar"'));
 						self.port.emit("loginPerformed", -1);
-						// var responseHtml = document.createElement(this.responseText);
-						// console.log(responseHtml);
-						// console.log("loginbar present: " + responseHtml.getElementById("loginbar").outerHTML);
-						// if(!this.responseText.getElementById("loginbar"))
-						// {
-						// 	console.log("we are logged in!!!");
-						// 	self.port.emit("loginPerformed", 1);
-						// }
-						// else
-						// 	console.log("but login failed :-()");
 					}
 					else
 						console.log("there was a problem with the response.status");
 				}
    		 	};
-			xhr.onload = function () {
-				// do something to response
-				
-
-			};
 			xhr.send(data);
 			console.log("data sent");
 		}
@@ -114,16 +93,16 @@ self.port.on("login", function(email, password)
 	}
 });
 
-// console.log("end of login script");
-
 self.port.on("refresh", function()
 {
 	console.log("loginWorker received refresh command");
 	var foodsharingTitle = document.querySelector("#layout_logo > a:nth-child(1)");
-	console.log("foodsharingTitle: " + foodsharingTitle);
+	// console.log("foodsharingTitle: " + foodsharingTitle);
 	if(Boolean(foodsharingTitle))
 	{
 		console.log("trying to click that naughty one");
 		foodsharingTitle.click();
 	}
 });
+
+// console.log("end of login script");

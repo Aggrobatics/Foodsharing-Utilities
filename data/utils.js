@@ -69,46 +69,14 @@ exports.makeDocRequest = function (url, onSuccess, onError) {
     httpRequest.send();
 };
 
-// DOES NOT WORK :-(
+// WINDOW ____________________________________________________________________________
 
-// exports.makeLoginPost = function (doc, email, pass) 
-// {
-    // anonymous posting?!
+exports.currentWindow = function()
+{
+    return require('sdk/window/utils').getMostRecentBrowserWindow();
+}
 
-    // console.log("makeLoginPost()");
-    // console.log("doc: " + doc);
-    // var form = doc.querySelector("#loginbar");
-    // console.log("form: " + form);
-    // var emailField = doc.body.getElementById("email");
-    // console.log("emailField: " + emailField);
-    // emailField.value = email;
-    // var passField = doc.body.getElementById("password")
-    // console.log("passField: " + passField);
-    // passField.value = pass;
-
-    // document = form;
-
-    // var form = doc.createElement("form");
-    // form.setAttribute("method", "post");
-    // form.setAttribute("action", url);
-
-    // var emailField = document.createElement("input");
-    // emailField.setAttribute("type", "email");
-    // emailField.setAttribute("name", "email_adress");
-    // emailField.setAttribute("value", email);
-    // form.appendChild(emailField);
-
-    // var passField = document.createElement("input");
-    // passField.setAttribute("type", "password");
-    // passField.setAttribute("name", "password");
-    // passField.setAttribute("value", pass);
-    // form.appendChild(passField);
-
-    // doc.body.appendChild(form);
-//     doc.submit();
-// };
-
-// TESTING ____________________________________________________________________________
+// CHECKING ____________________________________________________________________________
 
 exports.checkLoginWithDom = function (document) {
     if (document.getElementById("loginbar")) {
@@ -120,6 +88,8 @@ exports.checkLoginWithDom = function (document) {
         return true;
     }
 };
+
+// CONSTRUCTORS ____________________________________________________________________________
 
 exports.PickupObject = function(placeString, timeString, pageLink) {
     console.log("utils.createSimplePickupObj()");
@@ -147,6 +117,9 @@ exports.MessageObject = function(title, msg, moment) {
     return obj;
 }
 
+
+// TRANSLATION
+
 exports.getSoundFileName = function(value)
 {
     console.log("getSoundFileName(" + value +")");
@@ -168,10 +141,3 @@ exports.getSoundFileName = function(value)
         console.log("could not find match for value: " + value);
     }
 };
-
-
-exports.currentWindow = function()
-{
-    return require('sdk/window/utils').getMostRecentBrowserWindow();
-}
-

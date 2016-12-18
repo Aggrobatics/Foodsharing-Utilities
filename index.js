@@ -20,27 +20,24 @@
  
  * ***** END LICENSE BLOCK ***** */
 
-try
-{
 
-
+// Objects
 var data = require("sdk/self").data;
 var utils = require("./data/utils");
-var dateHelper = require("./data/dateHelper");
+var tabs = require("sdk/tabs");
+var panel;
+var loginWorker;
+var notifications = require("sdk/notifications");
 var settings = require("sdk/simple-prefs").prefs;
+
+// SETTING NAMES:
+
 // pickupIntervalTime
 // msgIntervalTime
 // notificationTime
 // autoLogin
 // playSounds
 // soundFileNr
-
-
-// Objects
-var tabs = require("sdk/tabs");
-var panel;
-var notifications = require("sdk/notifications");
-
 
 // Arrays
 var foodsharingTabs = [];
@@ -64,66 +61,20 @@ var pass;
 var { setInterval, clearInterval, setTimeout, clearTimeout } = require("sdk/timers");
 
 // Strings
-var buttonActive = "#00AAAA";
-var buttonInactive = "#FFFFFF";
-var buttonAlert = "#AA0000";
-var pickupURL;
-var messageURL;
+var buttonActiveColor = "#00AAAA";
+var buttonInactiveColor = "#FFFFFF";
+var buttonAlertColor = "#AA0000";
+var pickupURL = "https://foodsharing.de/?page=dashboard";
+var messageURL = "https://foodsharing.de/?page=msg";
 var msgSoundURL = data.url(utils.getSoundFileName(settings.soundFileNr));
-console.log("msgSoundURL: " + msgSoundURL);
-var loginURL = "/?page=login&amp;ref=%2F%3Fpage%3Ddashboard";
+
 
 // Bools
 var b_originalTabText = true;
 var b_requestInstantOnLogin = true;
 var b_loggedIn = false;
-var b_passwordPresent = true;
+var b_passwordPresent = false;
 var b_readyForNextNotify = true;
-
-// Test Settings
-var b_useFakeData = true;
-var b_useLoginRequest = false;
-var b_useFakeLogin = true;
-var b_useFakePickupDates = true;
-var b_useFakeMessages = true;
-                                                                        // REMOVE THIS LATER ON!
-if(b_useFakeData)
-{
-  settings.msgIntervalTime = 1;
-  settings.pickupIntervalTime = 1;
-  
-  if(b_useFakeLogin)
-  {
-    b_passwordPresent = true;
-    var email = "max.dusemund@trash-mail.com";
-    var pass = "wegwerfpasswort";
-  }
-  else
-  {
-    b_passwordPresent = true;
-    var email = "markus.schmieder@gmx.de";
-    var pass = "Joe5023234";
-  }
-}
-
-if(b_useFakePickupDates)
-{
-  pickupURL = data.url("fakePickupsHTML.html");
-}
-else
-{
-  pickupURL = "https://foodsharing.de/?page=dashboard";
-}
-
-if(b_useFakeMessages)
-{
-  messageURL = data.url("fakeMsgHTML.html");
-}
-else
-{
-  messageURL = "https://foodsharing.de/?page=msg";
-}
-
 
 // PREFERENCES ____________________________________________________________________________
 
@@ -195,7 +146,7 @@ tabs.on('ready', function(tab)
   // tab is in array (0 equals to false)
   if (Boolean(index+1)) {
     // ...and does not match website anymore
-    if(!tab.url.match("https://foodsharing.de*")) {
+    if(!tab.url.match("https://foodsharing*")) {
       // remove tab
       foodsharingTabs.splice( index, 1 );
       console.log("New tabArray after remove: " + foodsharingTabs);
@@ -256,8 +207,6 @@ tabs.on('ready', function(tab)
 
 // LOGIN WORKER AND IMPLICATIONS ____________________________________________________________________________
 
-// console.log("creating loginWorker");
-
 loginWorker = require("sdk/page-worker").Page(
 {
   contentScriptFile:  data.url("loginWorker.js"),
@@ -315,7 +264,7 @@ var button = require("sdk/ui/button/toggle").ToggleButton({
     "64": "./gabel-64.png"
   },
 	badge: 0,
-	badgeColor: buttonInactive,
+	badgeColor: buttonInactiveColor,
   onClick: handleButtonChange
 });
 
@@ -369,21 +318,12 @@ function handleNewLogin()
      console.log("cleared failedLoginTimerID");
   }
 
-  if(!b_loggedIn)
-  {
-    console.log("something went pretty wrong here mate");
-    return;
-  }
   panel.port.emit("showLoggedIn");
-  // UI
-  button.badgeColor = buttonActive;
-  
-  
-  // foodsharingTabs.forEach(function(tab)
-  // {
-  //   tab.reload();
-  // });
 
+  // UI
+  button.badgeColor = buttonActiveColor;
+  
+  
   // START INTERVAL TIMERS
 
   // messages
@@ -409,7 +349,7 @@ function handleNewLogin()
     if(b_requestInstantOnLogin)
       requestPickupDocAndHandle();
   }
-  console.log("request login-notification");
+  console.log("trigger login-notification");
   showNotification("You are now logged in!");
 
   console.log("end of handleNewLogin()");
@@ -429,12 +369,13 @@ function handleNewLogoff()
   // refreshing contentURL did NOT work!!!
   // reconstructing loginWorker did not work!!!
   // lost all port-connection to loginWorker either way
+  // last resort: have loginWorker click the dashboard-button
   console.log("informing loginWorker to refresh");
   loginWorker.port.emit("refresh");
 
 
   // UI
-  button.badgeColor = buttonInactive;
+  button.badgeColor = buttonInactiveColor;
   button.badge.value = undefined;
   panel.port.emit("showLoggedOff");
   // STOP INTERVAL TIMERS
@@ -459,14 +400,8 @@ function handleButtonChange(state)
       console.log("...sending all requests");
       requestMsgDocAndHandle();
       requestPickupDocAndHandle();
-
-      console.log("show panel now");
-      showPanel();
     }
-    else
-    {
-      showPanel();
-    }
+    showPanel();
   }
   else
   {
@@ -476,11 +411,6 @@ function handleButtonChange(state)
 
 function showPanel()
 {
-  // if(b_loggedIn)
-  //   panel.port.emit("showLoggedIn", pickupHTMLElement, unreadMsgArray);
-  // else
-  //   panel.port.emit("showLoggedOff");
-  
   panel.show({position: button});
 }
 
@@ -489,9 +419,11 @@ function updateBadge(value)
   if(value > button.badge)
   {
     console.log("value is greater than badge-value. adjusting...")
+    
     // unread messages have increased!
-    button.badgeColor = buttonAlert;
+    button.badgeColor = buttonAlertColor;
     button.badge = value;
+    
     // handle blinking
     if((foodsharingTabs.length > 0) && (!blinkIntervalID) && (value >0))
     {
@@ -515,7 +447,7 @@ function updateBadge(value)
     button.badge = value;
     // unread messages have decreased (by user action) and...
     // blink interval is running
-    button.badgeColor = buttonActive;
+    button.badgeColor = buttonActiveColor;
     stopBlinkInterval();
   }
 }
@@ -542,7 +474,7 @@ function requestMsgDocAndHandle()
     }, 
     function() // Error function
     {
-      console.log("failed to open fakeMsgHTML.html file");
+      console.log("failed to get " + messageURL);
     });
     return;
 }
@@ -555,7 +487,7 @@ function handleMsgDocReload(doc)
   if(Boolean(convList))
   {
     unreadMsgArray = [];
-    msgListLength = convList.length;
+    var msgListLength = convList.length;
     console.log("there are " + msgListLength + " unread messages");
     for(var i = 0; i < msgListLength; i++)
     {
@@ -597,7 +529,7 @@ function requestPickupDocAndHandle()
   }, 
   function() // Error function
   {
-    console.log("failed to open htmlTempStorage.html file");
+    console.log("failed to get " + pickupURL);
   });
   return;
 }
@@ -624,10 +556,9 @@ function handlePickupDocReload(doc)
         var placeElement = item.querySelector("span:nth-child(2)");
         // console.log("Place: " + placeElement.innerHTML);
         // console.log("Time: " + timeElement.innerHTML);
-        
 
-        // var dateFormatted = dateHelper.parseTime(timeElement.innerHTML);
-        // console.log("dateHelper says: " + timeFormatted);
+
+
         var pickupObject = utils.PickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
         console.log(pickupObject);
         pickupsArrayAll.push(pickupObject);
@@ -680,39 +611,26 @@ function stopBlinkInterval()
 
 function switchTabsTitles(value, messages)
 {
-  var blinkText;
+  var tabTitle;
   
   if(!value)
-    blinkText = "(" + messages + ") New Messages!";
+    tabTitle = "(" + messages + ") New Messages!";
   else if(messages > 0)
-    blinkText = "(" + messages + ") Foodsharing | Restlos Gluecklich";
-  else
-    blinkText = "Foodsharing | Restlos Gluecklich";
+    tabTitle = "(" + messages + ") Foodsharing | Restlos Gluecklich";
+  else // value == true
+    tabTitle = "Foodsharing | Restlos Gluecklich";
 
   // console.log("changing tabs' titles to '" + blinkText + "'");
 
   for (i = 0; i < foodsharingTabs.length; i++) {
-    foodsharingTabs[i].title = blinkText;
+    foodsharingTabs[i].title = tabTitle;
   } 
 }
 
-// If you pass it a single property, only credentials matching that property are returned:
 function getPasswordsForFsAndLogin() 
 {
   // console.log("getPasswordsForFsAndLogin()");
-  if(b_passwordPresent)                                                                   // Only for debugging purposes more or lesss
-  {
-    console.log("b_passwordPresent = true. Sending login now");
-    sendLoginRequest();
-    failedLoginTimerID = setTimeout(function()
-    {
-      console.log("It seems the login functionality does not work here");
-      showNotification("It seems the login-function does not work on your system. I am very sorry for that!");
-    }, 5000); 
-    return;
-  }
-  else
-  {
+
     require("sdk/passwords").search({
     url: "https://foodsharing.de",
     onComplete: function onComplete(credentials) {
@@ -724,6 +642,12 @@ function getPasswordsForFsAndLogin()
         pass = credentials[0].password;
 
         sendLoginRequest();
+
+        failedLoginTimerID = setTimeout(function()
+        {
+          console.log("It seems the login functionality does not work here");
+          showNotification("It seems the login-function does not work on your system. I am very sorry for that!");
+        }, 5000); 
         return;
       }
       else
@@ -734,64 +658,18 @@ function getPasswordsForFsAndLogin()
       }
     }
     });
-  }
 }
 
 function sendLoginRequest()
 {
   if(b_passwordPresent)
   {
-    if(b_useLoginRequest)
-    {
-      console.log("sending login POST");
-      utils.makeDocRequest(data.url("submitForm.html"), 
-      function(submitForm) // OnSuccess
-      {
-        console.log("Got submitForm.html! Passing to makeLoginPost() now");
-        // submit loginData using submitForm.html
-        utils.makeLoginPost(submitForm, email, pass);
-
-        console.log("starting loginCheck Interval");
-        // And start checking (repeatedly) for login....
-        checkLoginIntervalID = setInterval(function() 
-        {
-          console.log("loginCheck tick");
-          utils.makeDocRequest("loginURL", function(doc)
-          {
-              console.log("requesting page for loginCheck");
-              if(utils.checkLoginWithDom(doc))
-              {
-                console.log("checkLoginWithDom() returned true");
-                clearInterval(checkLoginIntervalID);
-                b_loggedIn = true;
-                handleNewLogin();
-              }
-              else
-              {
-                console.log("Checked site. still not logged in!");
-              }
-          },
-          function()
-          {
-            console.log("Request to " + loginURL + " for loginCheck failed");
-          });
-        }, 2000);
-      },
-      function()  // onError
-      {
-        console.log("could not open submitForm.html");
-      });
-    }
-    else
-    {
       loginWorker.port.emit("login", email, pass);
-    }
   }
   else
   {
     console.log("Cannot send login-request without email and password!");
   }
-
 }
 
 function checkLoginRepeatedly()
@@ -842,8 +720,6 @@ function playMsgSound()
   var window = utils.currentWindow();
 
   // console.log("Got the window: " + window);
-  // var AudioContext = window.AudioContext || window.webkitAudioContext;
-  // console.log("AudioContext : " + AudioContext);
   const {XMLHttpRequest} = require("sdk/net/xhr");
   var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   var source = audioCtx.createBufferSource();
@@ -857,15 +733,17 @@ function playMsgSound()
   request.onload = function() {
     var audioData = request.response;
 
-    audioCtx.decodeAudioData(audioData, function(buffer) {
+    audioCtx.decodeAudioData(audioData, 
+      function(buffer) 
+      {
         source.buffer = buffer;
-
         source.connect(audioCtx.destination);
         source.loop = false;
       },
-
-      function(e){"Error with decoding audio data" + e.err});
-
+      function(e)
+      {
+        "Error with decoding audio data" + e.err;
+      });
   }
 
   request.send();
@@ -905,11 +783,4 @@ if(settings.autoLogin)
 {
   console.log("autoLogin = true");
   getPasswordsForFsAndLogin();
-}
-
-
-}
-catch (e)
-{
-  console.log("error code: ", e);
 }
