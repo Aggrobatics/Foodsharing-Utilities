@@ -72,7 +72,7 @@ Licence:	Attribution Licence
 
 /* ***** BEGIN LICENSE BLOCK *****
  
- * Author: Markus Schmieder (Aggrobatics)
+ * Author: Markus Schmieder (Aggrobatics / Maks_Imal)
  
  * This file is part of The Firefox Foodsharing-Utilities Addon.
  
