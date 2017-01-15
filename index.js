@@ -167,13 +167,12 @@ tabs.on('ready', function(tab)
     // on website. Check for a change in login-status
     var loginChecker;
     
-    // html-event-listener is declared above
+    // loggedIn-event-listener is declared below
     loginChecker = tab.attach({
-      contentScript: 'self.port.emit("html", !Boolean(document.getElementById("loginbar")));'
+      contentScript: 'self.port.emit("loggedIn", !Boolean(document.getElementById("loginbar")));'
     });
 
-    // need to attach listener before attaching script to tab, since it will be executed immediately!
-    loginChecker.port.on("html", function(b_value)
+    loginChecker.port.on("loggedIn", function(b_value)
     {
       console.log("Login Status: " + b_value);
       if((b_loggedIn) && (!b_value))
@@ -229,17 +228,20 @@ loginWorker.port.on("loginPerformed", function(value)
   switch(value) 
   {
     case 1:
-      if((value == 1) && (!b_loggedIn))
+      if(!b_loggedIn)
       {
         console.log("login succesfull");
-        b_loggedIn = value;
+        b_loggedIn = true;
         handleNewLogin();
       }
       break;
     case 0:
       console.log("loginWorker says login was not succesfull!");
-      b_loggedIn = false;
-      handleNewLogoff();
+      if(b_loggedIn)
+      {
+        b_loggedIn = false;
+        handleNewLogoff();
+      }
       break;
     case -1:
       console.log("loginWorker requests loginCheck");
@@ -268,6 +270,25 @@ var button = require("sdk/ui/button/toggle").ToggleButton({
   onClick: handleButtonChange
 });
 
+// Show the panel when the user clicks the button.
+function handleButtonChange(state) 
+{    
+  // console.log("handle button change has been called");
+  if(state.checked)
+  {
+    if(Boolean(b_loggedIn))
+    {
+      console.log("...sending all requests");
+      requestMsgDocAndHandle();
+      requestPickupDocAndHandle();
+    }
+    showPanel();
+  }
+  else
+  {
+    panel.hide();
+  }
+}
 
 // PANEL    ____________________________________________________________________________
 
@@ -293,24 +314,14 @@ panel.port.on("openTab", function(address)
   tabs.open(address);
 });
 
-// does not work, as checkbox does not fire any events!
-panel.port.on("autoLoginChanged", function(autoLogin){
-  console.log("auto login changed to: " + autoLogin);
-  settings.autoLogin = autoLogin;
-});
-
-panel.port.on("open", function(link)
-{
-  console.log("received request from panel to open " + link);
-});
-
-
 
 // FUNCTION IMPLEMENTATIONS ____________________________________________________________________________
 
 function handleNewLogin()
 {
   console.log("handleNewLogin()")
+
+  b_loggedIn = true;
 
   if(failedLoginTimerID)
   {
@@ -387,26 +398,6 @@ function handleNewLogoff()
   pickupIntervalID = 0;
 
   stopBlinkInterval();
-}
-
-// Show the panel when the user clicks the button.
-function handleButtonChange(state) 
-{    
-  // console.log("handle button change has been called");
-  if(state.checked)
-  {
-    if(Boolean(b_loggedIn))
-    {
-      console.log("...sending all requests");
-      requestMsgDocAndHandle();
-      requestPickupDocAndHandle();
-    }
-    showPanel();
-  }
-  else
-  {
-    panel.hide();
-  }
 }
 
 function showPanel()
