@@ -155,14 +155,14 @@ tabs.on('ready', function(tab)
   // tab is not in array
   else {
     // ...and matches website
-    if (tab.url.match("https://foodsharing.de*")) {
+    if (tab.url.match("https://foodsharing*")) {
       // add tab
       foodsharingTabs.push(tab);
       console.log("New tabArray after add: " + foodsharingTabs);
     }
   }
 
-  if(tab.url.match("https://foodsharing.de*"))
+  if(tab.url.match("https://foodsharing*"))
   {
     // on website. Check for a change in login-status
     var loginChecker;

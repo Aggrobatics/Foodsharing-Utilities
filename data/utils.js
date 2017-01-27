@@ -43,16 +43,9 @@ exports.makeDocRequest = function (url, onSuccess, onError) {
     }
 
     // ON SUCCESS
-    httpRequest.onLoad = function () {
-        console.log("onLoad. But that's not defined...");
-        onLoad(this.responseXML);
-    };
     httpRequest.onreadystatechange = function () {
         if (httpRequest.readyState === XMLHttpRequest.DONE) {
             if (httpRequest.status === 200) {
-                // console.log("HttpRequest has returned as DONE");
-                // document.documentElement
-                // or document.body
                 onSuccess(this.responseXML);
             }
             else {
