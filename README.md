@@ -1,3 +1,24 @@
+/* ***** BEGIN LICENSE BLOCK *****
+ 
+ * Author: Markus Schmieder (Aggrobatics / Maks_Imal)
+ 
+ * This file is part of The Firefox Foodsharing-Utilities Addon.
+ 
+ * The Firefox Foodsharing-Utilities Addon is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ 
+ * The Firefox Foodsharing-Utilities Addon is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ 
+ * You should have received a copy of the GNU General Public License
+ * along with The Firefox Foodsharing-Utilities Addon.  If not, see http://www.gnu.org/licenses/.
+ 
+ * ***** END LICENSE BLOCK ***** */
+
 #Foodsharing-Utilities Addon
 Adds a few handy functions to the foodsharing website
 
@@ -69,24 +90,3 @@ Author:		zimbot
 Weblink:	https://freesound.org/people/zimbot/sounds/89368/
 Changes:	None
 Licence:	Attribution Licence
-
-/* ***** BEGIN LICENSE BLOCK *****
- 
- * Author: Markus Schmieder (Aggrobatics / Maks_Imal)
- 
- * This file is part of The Firefox Foodsharing-Utilities Addon.
- 
- * The Firefox Foodsharing-Utilities Addon is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- 
- * The Firefox Foodsharing-Utilities Addon is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- 
- * You should have received a copy of the GNU General Public License
- * along with The Firefox Foodsharing-Utilities Addon.  If not, see http://www.gnu.org/licenses/.
- 
- * ***** END LICENSE BLOCK ***** */
