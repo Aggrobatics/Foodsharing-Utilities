@@ -141,3 +141,22 @@ exports.getSoundFileName = function(value)
         console.log("could not find match for value: " + value);
     }
 };
+
+// Credits: JefClaes (http://www.jefclaes.be)
+exports.queue = function() 
+{
+    var elements;
+    
+    this.enqueue = function(element) {
+        if (typeof(elements) === 'undefined') {
+            elements = [];   
+        }
+        elements.push(element);                       
+    }
+    this.dequeue = function() {
+        return elements.shift();                                                
+    }
+    this.peek = function(){
+        return elements[0];                  
+    }
+}

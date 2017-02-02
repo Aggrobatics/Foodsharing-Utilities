@@ -29,6 +29,8 @@ var panel;
 var loginWorker;
 var notifications = require("sdk/notifications");
 var settings = require("sdk/simple-prefs").prefs;
+var windowUtils = require('sdk/window/utils');
+var notifyQueue = new utils.queue();
 
 // SETTING NAMES:
 
@@ -53,9 +55,6 @@ var failedLoginTimerID = 0;
 var failedLogins = 0;
 var numberOfUpcomingDates = 0;
 
-// Login data
-var email;
-var pass;
 
 // Functions
 var { setInterval, clearInterval, setTimeout, clearTimeout } = require("sdk/timers");
@@ -155,14 +154,14 @@ tabs.on('ready', function(tab)
   // tab is not in array
   else {
     // ...and matches website
-    if (tab.url.match("https://foodsharing.de*")) {
+    if (tab.url.match("https://foodsharing*")) {
       // add tab
       foodsharingTabs.push(tab);
       console.log("New tabArray after add: " + foodsharingTabs);
     }
   }
 
-  if(tab.url.match("https://foodsharing.de*"))
+  if(tab.url.match("https://foodsharing*"))
   {
     // on website. Check for a change in login-status
     var loginChecker;
@@ -629,10 +628,10 @@ function getPasswordsForFsAndLogin()
       {
         console.log("there are saved passwords!");
         b_passwordPresent = true;
-        email = credentials[0].username;
-        pass = credentials[0].password;
+        var email = credentials[0].username;
+        var pass = credentials[0].password;
 
-        sendLoginRequest();
+        sendLoginRequest(email, pass);
 
         failedLoginTimerID = setTimeout(function()
         {
@@ -651,9 +650,9 @@ function getPasswordsForFsAndLogin()
     });
 }
 
-function sendLoginRequest()
+function sendLoginRequest(email, pass)
 {
-  if(b_passwordPresent)
+  if(Boolean(email) && Boolean(pass))
   {
       loginWorker.port.emit("login", email, pass);
   }
@@ -708,7 +707,7 @@ function playMsgSound()
 {
   console.log("playSound("+ msgSoundURL + ")");
 
-  var window = utils.currentWindow();
+  var window = windowUtils.getMostRecentBrowserWindow();
 
   // console.log("Got the window: " + window);
   const {XMLHttpRequest} = require("sdk/net/xhr");
@@ -758,11 +757,20 @@ function showNotification(text)
       setTimeout(function()
       {
         console.log("Timeout done. Notify-System is open again");
+
         b_readyForNextNotify = true;
+        if(Boolean(notifyQueue.peek()))
+        {
+          console.log("There is a notification waiting. Display!");
+          showNotification(notifyQueue.dequeue());
+        }
       }, 3000); 
     }
     else
-      console.log("notification system blocked! Notify is rejected");
+    {
+      console.log("notification system blocked! Notify is put in queue");
+      notifyQueue.enqueue(text);
+    }
   }
   else
     console.log("Sorry dawg! No text, no notification!");

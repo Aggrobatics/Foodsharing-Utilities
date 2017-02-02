@@ -26,6 +26,8 @@ var messagesList = document.getElementById("messagesList");
 var statusDiv = document.getElementById("status");
 var body = document.body;
 var loggedIn = false;
+var brElement = document.createElement("br");
+
 
 body.addEventListener("click", function(event)
 {
@@ -64,24 +66,48 @@ self.port.on("showLoggedOff", function()
 self.port.on("updateMsg", function(messages)
 {
   console.log("panel received message update");
+  
+  console.log("First child: " + messagesList.firstChild);
+  // Flush list
+  while (messagesList.firstChild) {
+    messagesList.removeChild(messagesList.firstChild);
+  }
 
   if(loggedIn)
   {
-    var totalString = "";
     for(var i = 0 ; i < messages.length; i++)
     {
-      var element;
-      element = '<li> <a href="https://foodsharing.de/?page=msg" class="liContent">';
-        element += '<span class="name">' + messages[i].name + '</span><br>';
-        element += '<span class="time">' + messages[i].time + '</span><br>';
-        element += '<span class="message">' + messages[i].message + '</span><br>';
-      element += "</a></li>";
-      if(i < messages.length - 1)
-        element += "<br>";
+      var name;
+      name = document.createElement("span");
+      name.appendChild(document.createTextNode(messages[i].name));
+      name.className = "name";
 
-      totalString += element;
-    }
-    messagesList.innerHTML = totalString;
+      var time;
+      time  = document.createElement("span");
+      time.appendChild(document.createTextNode(messages[i].time));
+      time.className = "time";
+
+      var message;
+      message = document.createElement("span");
+      message.appendChild(document.createTextNode(messages[i].message));
+      message.className = "message";
+
+      var newLinkItem = document.createElement("a");
+      newLinkItem.href="https://foodsharing.de/?page=msg";
+      newLinkItem.className = "liContent";
+      newLinkItem.appendChild(name);
+      newLinkItem.appendChild(time);
+      newLinkItem.appendChild(message);
+      newLinkItem.insertBefore(brElement.cloneNode(), time);
+      newLinkItem.insertBefore(brElement.cloneNode(), message);
+      newLinkItem.appendChild(brElement.cloneNode());
+
+      var newMessageItem = document.createElement("li");
+      newMessageItem.appendChild(newLinkItem);
+      newMessageItem.appendChild(brElement.cloneNode());
+
+      messagesList.appendChild(newMessageItem); 
+    } 
   }
   else
     console.log("But panel is in logged-off mode and will ignore");
@@ -90,22 +116,49 @@ self.port.on("updateMsg", function(messages)
 self.port.on("updatePickups", function(pickupDates)
 {
   console.log("panel received pickup update");
+
+  while (pickupDatesList.firstChild) {
+    pickupDatesList.removeChild(pickupDatesList.firstChild);
+  }
+
   if(loggedIn)
   {
-    var totalString = "";
     for(var i = 0 ; i < pickupDates.length; i++)
     {
-      var element;
-      element = '<li> <a href="' + pickupDates[i].href + '"  class="liContent">';
-        element += '<span class="name">' + pickupDates[i].place_string + '</span><br>';
-        element += '<span class="time">' + pickupDates[i].time_string + '</span><br>';
-      element += "</a></li>"
-      if(i < messages.length - 1)
-        element += "<br>";
+      // var element;
+      // element = '<li> <a href="' + pickupDates[i].href + '"  class="liContent">';
+      //   element += '<span class="name">' + pickupDates[i].place_string + '</span><br>';
+      //   element += '<span class="time">' + pickupDates[i].time_string + '</span><br>';
+      // element += "</a></li>"
+      // if(i < messages.length - 1)
+      //   element += "<br>";
 
-      totalString += element;
+      // totalString += element;
+
+      var place;
+      place = document.createElement("span");
+      place.appendChild(document.createTextNode(pickupDates[i].place_string));
+      place.className = "name";
+
+      var time;
+      time  = document.createElement("span");
+      time.appendChild(document.createTextNode(pickupDates[i].time_string));
+      time.className = "time";
+
+      var newLinkItem = document.createElement("a");
+      newLinkItem.href = pickupDates[i].href;
+      newLinkItem.className = "liContent";
+      newLinkItem.appendChild(place);
+      newLinkItem.appendChild(time);
+      newLinkItem.insertBefore(brElement.cloneNode(), time);
+      newLinkItem.appendChild(brElement.cloneNode());
+
+      var newPickupItem = document.createElement("li");
+      newPickupItem.appendChild(newLinkItem);
+      newPickupItem.appendChild(brElement.cloneNode());
+
+      pickupDatesList.appendChild(newPickupItem); 
     }
-    pickupDatesList.innerHTML = totalString; 
   }
   else
     console.log("But panel is in logged-off mode and will ignore");

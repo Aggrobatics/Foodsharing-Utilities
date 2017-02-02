@@ -42,50 +42,27 @@ self.port.on("login", function(email, password)
 	// if not logged in, log in
 	if(document.getElementById("loginbar"))
 	{
-		if(b_usePost)
-		{
-			console.log("using POST. email: " + email + "; password: " + password);
+		console.log("found loginbar!");
+		var form = document.getElementById("loginbar");
 
-			var data = "email_adress=" + email + "&password=" + password;
+		// enter email
+		document.querySelector("#loginbar input[name=email_adress]").value = email;
+		
+		// enter password
+		document.querySelector("#loginbar input[name=password]").value = password;
 
-			var xhr = new XMLHttpRequest();
-			xhr.open('POST', "https://foodsharing.de", true);
-			xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-			// xhr.responseType = "document";
-			
-			
-			xhr.onreadystatechange = function () 
-			{
-				if (xhr.readyState === XMLHttpRequest.DONE) 
-				{
-					if (xhr.status === 200) 
-					{
-						console.log("status = 200. Object: " + Boolean(this.responseText));
-						console.log("loginbar index: " + this.responseText.search('id="loginbar"'));
-						self.port.emit("loginPerformed", -1);
-					}
-					else
-						console.log("there was a problem with the response.status");
-				}
-   		 	};
-			xhr.send(data);
-			console.log("data sent");
-		}
-		else
-		{
-			console.log("found loginbar!");
-			// console.log("Received login command. Trying to log in now");	
-			var form = document.getElementById("loginbar");
 
-			// enter email
-			document.querySelector("#loginbar input[name=email_adress]").value = email;
-			
-			// enter password
-			document.querySelector("#loginbar input[name=password]").value = password;
+		// // enter email
+		// var nameField = document.querySelector("#loginbar input[name=email_adress]");
+		// nameField.appendChild(document.createTextNode(name));
+		
+		// // enter password
+		// var passField = document.querySelector("#loginbar input[name=password]");
+		// passField.appendChild(document.createTextNode(password));
 
-			// submit will reload the page and restart the script
-			form.submit();
-		}
+
+		// submit will reload the page and restart the script
+		form.submit();
 	}
 	else
 	{
@@ -97,12 +74,9 @@ self.port.on("refresh", function()
 {
 	console.log("loginWorker received refresh command");
 	var foodsharingTitle = document.querySelector("#layout_logo > a:nth-child(1)");
-	// console.log("foodsharingTitle: " + foodsharingTitle);
 	if(Boolean(foodsharingTitle))
 	{
 		console.log("trying to click that naughty one");
 		foodsharingTitle.click();
 	}
 });
-
-// console.log("end of login script");

@@ -90,3 +90,7 @@ Author:		zimbot
 Weblink:	https://freesound.org/people/zimbot/sounds/89368/
 Changes:	None
 Licence:	Attribution Licence
+
+Code Snippets:
+
+'Queue' by courtesy of JefClaes (http://www.jefclaes.be)
