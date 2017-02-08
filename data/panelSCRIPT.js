@@ -26,8 +26,11 @@ var messagesList = document.getElementById("messagesList");
 var statusDiv = document.getElementById("status");
 var body = document.body;
 var loggedIn = false;
-var brElement = document.createElement("br");
-
+var brPrototype = document.createElement("br");
+var centerPrototype = document.createElement("center");
+var iPrototype = document.createElement("i");
+var bPrototype = document.createElement("b");
+var subPrototype = document.createElement("sub");
 
 body.addEventListener("click", function(event)
 {
@@ -43,7 +46,14 @@ body.addEventListener("click", function(event)
 self.port.on("showLoggedIn", function() {
   console.log("panel received login-info");
   loggedIn = true;
-  statusDiv.innerHTML = "<center><i>You are now logged in!</i><center>";
+  statusDiv.accessKey
+  
+  clearInnerHTML(statusDiv);
+  var iElement = iPrototype.cloneNode();
+  iElement.textContent = "You are now logged in!";
+  var centerElement = centerPrototype.cloneNode();
+  centerElement.appendChild(iElement);
+  statusDiv.appendChild(centerElement);
 
   button.innerHTML = "";
   button.className = "openTab";
@@ -52,15 +62,9 @@ self.port.on("showLoggedIn", function() {
 
 self.port.on("showLoggedOff", function()
 {
-  console.log("panel received logoff-info");
-  loggedIn = false;
-  messagesList.innerHTML = "";
-  pickupDatesList.innerHTML = "";
-  statusDiv.innerHTML = "<center><b>You are currently not logged in</b><br><sub>There is nothing to see here</sub><center>";
-
-  button.innerHTML = "Login Now!";
-  button.className = "";
-  button.onclick = function(){self.port.emit("login");};
+  // Since this behaviour has to execute on startup, we need an internally callable method
+  // (check last line of the script)
+  showLoggedOff();
 });
 
 self.port.on("updateMsg", function(messages)
@@ -68,10 +72,9 @@ self.port.on("updateMsg", function(messages)
   console.log("panel received message update");
   
   console.log("First child: " + messagesList.firstChild);
+  
   // Flush list
-  while (messagesList.firstChild) {
-    messagesList.removeChild(messagesList.firstChild);
-  }
+  clearInnerHTML(messagesList);
 
   if(loggedIn)
   {
@@ -98,13 +101,13 @@ self.port.on("updateMsg", function(messages)
       newLinkItem.appendChild(name);
       newLinkItem.appendChild(time);
       newLinkItem.appendChild(message);
-      newLinkItem.insertBefore(brElement.cloneNode(), time);
-      newLinkItem.insertBefore(brElement.cloneNode(), message);
-      newLinkItem.appendChild(brElement.cloneNode());
+      newLinkItem.insertBefore(brPrototype.cloneNode(), time);
+      newLinkItem.insertBefore(brPrototype.cloneNode(), message);
+      newLinkItem.appendChild(brPrototype.cloneNode());
 
       var newMessageItem = document.createElement("li");
       newMessageItem.appendChild(newLinkItem);
-      newMessageItem.appendChild(brElement.cloneNode());
+      newMessageItem.appendChild(brPrototype.cloneNode());
 
       messagesList.appendChild(newMessageItem); 
     } 
@@ -117,23 +120,12 @@ self.port.on("updatePickups", function(pickupDates)
 {
   console.log("panel received pickup update");
 
-  while (pickupDatesList.firstChild) {
-    pickupDatesList.removeChild(pickupDatesList.firstChild);
-  }
-
+  clearInnerHTML(pickupDatesList);
+  
   if(loggedIn)
   {
     for(var i = 0 ; i < pickupDates.length; i++)
     {
-      // var element;
-      // element = '<li> <a href="' + pickupDates[i].href + '"  class="liContent">';
-      //   element += '<span class="name">' + pickupDates[i].place_string + '</span><br>';
-      //   element += '<span class="time">' + pickupDates[i].time_string + '</span><br>';
-      // element += "</a></li>"
-      // if(i < messages.length - 1)
-      //   element += "<br>";
-
-      // totalString += element;
 
       var place;
       place = document.createElement("span");
@@ -150,12 +142,12 @@ self.port.on("updatePickups", function(pickupDates)
       newLinkItem.className = "liContent";
       newLinkItem.appendChild(place);
       newLinkItem.appendChild(time);
-      newLinkItem.insertBefore(brElement.cloneNode(), time);
-      newLinkItem.appendChild(brElement.cloneNode());
+      newLinkItem.insertBefore(brPrototype.cloneNode(), time);
+      newLinkItem.appendChild(brPrototype.cloneNode());
 
       var newPickupItem = document.createElement("li");
       newPickupItem.appendChild(newLinkItem);
-      newPickupItem.appendChild(brElement.cloneNode());
+      newPickupItem.appendChild(brPrototype.cloneNode());
 
       pickupDatesList.appendChild(newPickupItem); 
     }
@@ -164,3 +156,37 @@ self.port.on("updatePickups", function(pickupDates)
     console.log("But panel is in logged-off mode and will ignore");
 });
 
+function clearInnerHTML(element)
+{
+  while (element.firstChild) {
+    element.removeChild(element.firstChild);
+  }
+}
+
+function showLoggedOff()
+{
+  console.log("panel received logoff-info");
+  loggedIn = false;
+
+  clearInnerHTML(messagesList);
+  clearInnerHTML(pickupDatesList);
+  clearInnerHTML(statusDiv);
+  var bElement = bPrototype.cloneNode();
+  var brElement = brPrototype.cloneNode();
+  var subElement = subPrototype.cloneNode();
+  var centerElement = centerPrototype.cloneNode();
+
+  bElement.textContent = "You are currently logged off";
+  subElement.textContent = "There is nothing to see here";
+
+  centerElement.appendChild(bElement);
+  centerElement.appendChild(brElement);
+  centerElement.appendChild(subElement);
+  statusDiv.appendChild(centerElement);
+
+  button.textContent = "Login";
+  button.className = "";
+  button.onclick = function(){self.port.emit("login");};
+}
+
+showLoggedOff();

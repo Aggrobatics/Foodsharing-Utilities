@@ -51,16 +51,6 @@ self.port.on("login", function(email, password)
 		// enter password
 		document.querySelector("#loginbar input[name=password]").value = password;
 
-
-		// // enter email
-		// var nameField = document.querySelector("#loginbar input[name=email_adress]");
-		// nameField.appendChild(document.createTextNode(name));
-		
-		// // enter password
-		// var passField = document.querySelector("#loginbar input[name=password]");
-		// passField.appendChild(document.createTextNode(password));
-
-
 		// submit will reload the page and restart the script
 		form.submit();
 	}

@@ -64,17 +64,12 @@ exports.makeDocRequest = function (url, onSuccess, onError) {
     // ON ERROR
     httpRequest.onError = onError;
 
+    // SEND
     httpRequest.open('GET', url);
     httpRequest.responseType = "document";
     httpRequest.send();
 };
 
-// WINDOW ____________________________________________________________________________
-
-exports.currentWindow = function()
-{
-    return require('sdk/window/utils').getMostRecentBrowserWindow();
-}
 
 // CHECKING ____________________________________________________________________________
 
@@ -84,7 +79,7 @@ exports.checkLoginWithDom = function (document) {
         return false;
     }
     else {
-        console.log("DOM check returned login was succesfull!");
+        console.log("DOM check returned, login was succesfull!");
         return true;
     }
 };
@@ -94,12 +89,11 @@ exports.checkLoginWithDom = function (document) {
 exports.PickupObject = function(placeString, timeString, pageLink) {
     console.log("utils.createSimplePickupObj()");
 
-    // cannot call parseT to fill property for some reason. crashes every time
     var obj = {
         place_string: placeString,
         time_string: timeString,
         href: pageLink,
-        date_formatted: dateHelper.parseTime(timeString), // dateFormatted, //  
+        date_formatted: dateHelper.parseTime(timeString),
         minutes_remaining: function () {
             return dateHelper.remainingTime(this.date_formatted);
         }
@@ -145,7 +139,7 @@ exports.getSoundFileName = function(value)
 // Credits: JefClaes (http://www.jefclaes.be)
 exports.queue = function() 
 {
-    var elements;
+    var elements = [];
     
     this.enqueue = function(element) {
         if (typeof(elements) === 'undefined') {

@@ -70,7 +70,6 @@ var msgSoundURL = data.url(utils.getSoundFileName(settings.soundFileNr));
 
 // Bools
 var b_originalTabText = true;
-var b_requestInstantOnLogin = true;
 var b_loggedIn = false;
 var b_passwordPresent = false;
 var b_readyForNextNotify = true;
@@ -344,7 +343,6 @@ function handleNewLogin()
     {
       requestMsgDocAndHandle();
     }, settings.msgIntervalTime * 60 * 1000);
-    if(b_requestInstantOnLogin)
       requestMsgDocAndHandle();
   }
 
@@ -356,11 +354,16 @@ function handleNewLogin()
     {
       requestPickupDocAndHandle();
     }, settings.pickupIntervalTime * 60 * 1000);
-    if(b_requestInstantOnLogin)
       requestPickupDocAndHandle();
   }
-  console.log("trigger login-notification");
+  // console.log("trigger login-notification");
   showNotification("You are now logged in!");
+
+  // refresh all open tabs
+  foodsharingTabs.forEach(function(openTab)
+  {
+    openTab.reload();
+  });
 
   console.log("end of handleNewLogin()");
 }
@@ -369,17 +372,13 @@ function handleNewLogoff()
 {
   console.log("handleNewLogoff");
 
-  if(b_loggedIn == true)
-  {
-    console.log("SOMETHING WENT TERRIBLY WRONG MATE");
-  }
   b_loggedIn = false;
   
   // refresh loginWorker, so it sees current page and can login
   // refreshing contentURL did NOT work!!!
   // reconstructing loginWorker did not work!!!
   // lost all port-connection to loginWorker either way
-  // last resort: have loginWorker click the dashboard-button
+  // last resort: have loginWorker click the dashboard-button - WORKS!
   console.log("informing loginWorker to refresh");
   loginWorker.port.emit("refresh");
 
@@ -397,6 +396,11 @@ function handleNewLogoff()
   pickupIntervalID = 0;
 
   stopBlinkInterval();
+
+  foodsharingTabs.forEach(function(openTab)
+  {
+    openTab.reload();
+  });
 }
 
 function showPanel()
@@ -506,7 +510,7 @@ function handleMsgDocReload(doc)
   }
   else
   {
-    console.log("Something went terribly wrong. Found neither loginbar, nor badge!");
+    console.log("Something went terribly wrong. Found neither loginbar, nor conversation List!");
   }
 }  
 
@@ -546,8 +550,6 @@ function handlePickupDocReload(doc)
         var placeElement = item.querySelector("span:nth-child(2)");
         // console.log("Place: " + placeElement.innerHTML);
         // console.log("Time: " + timeElement.innerHTML);
-
-
 
         var pickupObject = utils.PickupObject(placeElement.innerHTML, timeElement.innerHTML, pageLink);
         console.log(pickupObject);
@@ -764,7 +766,7 @@ function showNotification(text)
           console.log("There is a notification waiting. Display!");
           showNotification(notifyQueue.dequeue());
         }
-      }, 3000); 
+      }, 4000); 
     }
     else
     {
